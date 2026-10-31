@@ -19,9 +19,14 @@ Preview-first multiplayer AI workspace: 2 humans + Reviewer AI + Builder AI on o
 - Tests always use the rules engine (`vitest.config.ts` pins `LLM_PROVIDER=""`); `tests/llm.test.ts` stubs `fetch` for the Ollama adapter
 - SQLite writes are slow here: in tests, poll for a condition instead of sleeping a fixed time
 
+## Deployment
+- `Dockerfile` + `railway.json` (single replica); `scripts/start.sh` = `prisma db push` → `scripts/seed-if-empty.ts` → `next start`; SQLite at `/data/buildify.db`
+- `.dockerignore` excludes `.env` so local Ollama settings never ship; deployed AI uses `LLM_PROVIDER=openai` (OpenAI-compatible: Groq/OpenRouter)
+- Deploys from the user's fork `TanishqGoyal27/buildify-colab`; upstream is `Ridhi675/buildify-colab`
+
 ## Layout
 - `src/lib/engine/` — pure, deterministic logic (no DB): `spec.ts` (requirements → AppSpec, rebuild, diff), `context.ts` (fingerprints, stale check), `impact.ts` (Ripple Effect)
-- `src/lib/ai/` — `llm.ts` (Anthropic adapter, structured output, retries/timeouts), `agents.ts` (Reviewer/Builder capabilities, each with rules-engine fallback labelled `source: "rules"`)
+- `src/lib/ai/` — `llm.ts` (Anthropic / Ollama / OpenAI-compatible adapter, structured output, retries/timeouts), `agents.ts` (Reviewer/Builder capabilities, each with rules-engine fallback labelled `source: "rules"`)
 - `src/lib/server/` — `tasks.ts` (async runner, safe boundaries, epochs, controls, restart/recovery), `workflow.ts` (requirements, approvals, ripple, restore, compare), `core.ts` (activity, notifications, context commits), `actions.ts` (zod-validated action dispatcher), `realtime.ts` (SSE hub, presence, soft locks), `state.ts` (client snapshot), `seed.ts`
 - `src/app/api/` — `session`, `projects`, `projects/[id]/{state,action,stream}`
 - `src/components/` — `client.ts` (per-tab identity, `useProject` SSE hook), `AppRenderer.tsx` (safe JSON renderer), `workspace/` (shell + one file per view)

@@ -1,0 +1,12 @@
+# Never bake local secrets or local AI settings into the image; set env vars on the host.
+.env
+.env.*
+!.env.example
+node_modules
+.next
+.git
+prisma/*.db
+prisma/*.db-journal
+src/graphify-out
+coverage
+*.log

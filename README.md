@@ -79,7 +79,7 @@ More: [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md), [docs/DEMO_SCRIPT.md](do
 |---|---|---|
 | `DATABASE_URL` | `file:./dev.db` | SQLite path (relative to `prisma/`) or a Postgres URL |
 | `AUTH_SECRET` | — | HMAC secret for demo session tokens |
-| `LLM_PROVIDER` | empty | `anthropic`, `ollama`, or empty (Anthropic when a key is set, else rules engine) |
+| `LLM_PROVIDER` | empty | `anthropic`, `ollama`, `openai` (any OpenAI-compatible API), or empty (Anthropic when a key is set, else rules engine) |
 | `ANTHROPIC_API_KEY` | empty | Enables the Anthropic LLM path |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5` if unset | Model id |
 | `BC_LLM_EFFORT` | `medium` | Effort level for LLM calls |
@@ -89,6 +89,8 @@ More: [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md), [docs/DEMO_SCRIPT.md](do
 | `OLLAMA_NUM_CTX` | 8192 | Context window for Ollama calls |
 | `OLLAMA_THINK` | unset | `false` disables thinking on reasoning models (faster) |
 | `OLLAMA_KEEP_ALIVE` | `30m` | How long Ollama keeps the model loaded |
+| `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` | empty | OpenAI-compatible endpoint (Groq, OpenRouter, Together, vLLM…) for hosted open-weight models |
+| `OPENAI_JSON_MODE` | `schema` | `object` for models that reject `json_schema` (otherwise retried automatically) |
 | `BC_AGENT_STEP_MS` | 2500 | Pacing per agent phase (demo visibility) |
 | `BC_BUILD_PACING` | 5 | Multiplier for full builds, so humans can change requirements mid-flight |
 | `BC_TASK_TIMEOUT_MS` / `BC_LLM_TIMEOUT_MS` | 120000 / 60000 | Timeouts |
@@ -111,12 +113,18 @@ Change `provider = "sqlite"` to `"postgresql"` in `prisma/schema.prisma`, set `D
 
 ## Deployment
 
-The app needs a **long-running Node process** (SSE connections and in-process agent jobs), so serverless platforms are not a fit. Suggested: Render, Railway or Fly.io.
+The app needs a **long-running Node process** (SSE connections and in-process agent jobs), so serverless platforms are not a fit. The repo ships a `Dockerfile` (works on Railway, Render, Fly.io) and `railway.json`.
 
-1. Use Postgres (above) or a persistent volume for SQLite.
-2. Build command: `npm ci && npx prisma db push && npm run build`
-3. Start command: `npm start`; set `AUTH_SECRET` (and optionally `ANTHROPIC_API_KEY`).
-4. Run `npm run db:seed` once for the demo project.
+**Railway**
+1. New Project → Deploy from GitHub repo → pick this repo. Railway builds the `Dockerfile`.
+2. Variables: `AUTH_SECRET` (long random string) and an AI provider (below). Do not copy your local `.env` — `.dockerignore` keeps it out of the image on purpose.
+3. Optional: add a Volume mounted at `/data` so the SQLite database (`/data/buildify.db`) survives redeploys. Without it the demo is re-seeded on every deploy.
+4. Settings → Networking → Generate Domain for the public URL.
+
+On start, `scripts/start.sh` syncs the schema (`prisma db push`), seeds the CareConnect demo only if it is missing (`scripts/seed-if-empty.ts`), then runs `next start` on `$PORT`.
+
+**AI on a deployed server.** A server cannot reach Ollama on your laptop. Use a hosted open-weight model through an OpenAI-compatible API, e.g. Groq:
+`LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://api.groq.com/openai/v1`, `OPENAI_API_KEY=…`, `OPENAI_MODEL=<model id>`, plus `BC_PRICE_IN_PER_MTOK` / `BC_PRICE_OUT_PER_MTOK` for cost tracking. Or leave `LLM_PROVIDER` empty to use the labelled rules engine.
 
 Run a single instance — the realtime hub is in-memory. No public deployment has been made from this repository yet.
 

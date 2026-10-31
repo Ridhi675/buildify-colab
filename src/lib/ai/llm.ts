@@ -1,9 +1,10 @@
 // Provider adapter for structured LLM calls. Implemented providers: Anthropic
-// (hosted) and Ollama (local, open-weight models). Callers only see
-// `structured()` / `llmStatus()`, so another provider can be added behind the
-// same interface.
+// (hosted), Ollama (local, open-weight models) and any OpenAI-compatible
+// chat-completions API (Groq, OpenRouter, Together, ... — hosted open-weight
+// models). Callers only see `structured()` / `llmStatus()`, so another provider
+// can be added behind the same interface.
 //
-// Provider selection: LLM_PROVIDER=anthropic|ollama, or unset to use Anthropic
+// Provider selection: LLM_PROVIDER=anthropic|ollama|openai, or unset to use Anthropic
 // when ANTHROPIC_API_KEY is set. With no provider configured, `structured()`
 // returns null and callers use the deterministic rules engine instead. Every
 // output records which source made it.
@@ -20,11 +21,12 @@ export interface LlmResult<T> {
   costUsd: number;
 }
 
-type Provider = "anthropic" | "ollama" | "rules";
+type Provider = "anthropic" | "ollama" | "openai" | "rules";
 
 function provider(): Provider {
   const p = process.env.LLM_PROVIDER?.toLowerCase();
   if (p === "ollama") return "ollama";
+  if (p === "openai") return process.env.OPENAI_BASE_URL && process.env.OPENAI_MODEL ? "openai" : "rules";
   if (p === "anthropic" || !p) return process.env.ANTHROPIC_API_KEY ? "anthropic" : "rules";
   return "rules";
 }
@@ -32,18 +34,28 @@ function provider(): Provider {
 const anthropicModel = () => process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
 const ollamaModel = () => process.env.OLLAMA_MODEL || "qwen3:8b";
 const ollamaUrl = () => (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/+$/, "");
+const openaiModel = () => process.env.OPENAI_MODEL || "";
+const openaiUrl = () => (process.env.OPENAI_BASE_URL || "").replace(/\/+$/, "");
 const timeoutMs = () => Number(process.env.BC_LLM_TIMEOUT_MS ?? 60_000);
 // Local models cost nothing per token; pricing only applies to hosted providers.
 const priceIn = () => (provider() === "ollama" ? 0 : Number(process.env.BC_PRICE_IN_PER_MTOK ?? 2));
 const priceOut = () => (provider() === "ollama" ? 0 : Number(process.env.BC_PRICE_OUT_PER_MTOK ?? 10));
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+};
 
 export function llmStatus() {
   const p = provider();
   const enabled = p !== "rules";
   return {
     enabled,
-    provider: p,
-    model: p === "anthropic" ? anthropicModel() : p === "ollama" ? ollamaModel() : "deterministic rules engine",
+    provider: p === "openai" ? `openai-compatible (${hostOf(openaiUrl())})` : p,
+    model: p === "anthropic" ? anthropicModel() : p === "ollama" ? ollamaModel() : p === "openai" ? openaiModel() : "deterministic rules engine",
     pricing: { inPerMTok: priceIn(), outPerMTok: priceOut() },
   };
 }
@@ -86,6 +98,21 @@ async function callAnthropic<S extends z.ZodType>(opts: StructuredOpts<S>): Prom
   }
 }
 
+// Parse model text as JSON and validate it. Tolerates a leading <think> block
+// and ```json fences, which some open-weight models emit even in JSON mode.
+function parseOutput<S extends z.ZodType>(content: string | null | undefined, schema: S): z.infer<S> {
+  const text = (content ?? "").replace(/^\s*<think>[\s\S]*?<\/think>/, "").trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new LlmError("Output was not valid JSON");
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) throw new LlmError("Output did not match the schema");
+  return parsed.data as z.infer<S>;
+}
+
 // Ollama native chat API with JSON-schema constrained output (`format`).
 async function callOllama<S extends z.ZodType>(opts: StructuredOpts<S>): Promise<LlmResult<z.infer<S>>> {
   const body: Record<string, unknown> = {
@@ -117,15 +144,63 @@ async function callOllama<S extends z.ZodType>(opts: StructuredOpts<S>): Promise
   }
   const out = (await res.json()) as { model: string; message?: { content?: string }; done_reason?: string; prompt_eval_count?: number; eval_count?: number };
   if (out.done_reason === "length") throw new LlmError("Output truncated (num_predict)");
-  let json: unknown;
-  try {
-    json = JSON.parse(out.message?.content ?? "");
-  } catch {
-    throw new LlmError("Output was not valid JSON");
+  return { data: parseOutput(out.message?.content, opts.schema), model: out.model, tokensIn: out.prompt_eval_count ?? 0, tokensOut: out.eval_count ?? 0, costUsd: 0 };
+}
+
+// OpenAI-compatible chat completions (Groq, OpenRouter, Together, vLLM, ...).
+// Asks for JSON-schema output; providers or models that reject `json_schema`
+// are retried once in plain JSON mode (the schema is always in the prompt).
+async function callOpenAI<S extends z.ZodType>(opts: StructuredOpts<S>): Promise<LlmResult<z.infer<S>>> {
+  const schema = z.toJSONSchema(opts.schema);
+  const objectMode = process.env.OPENAI_JSON_MODE === "object";
+  const send = async (mode: "schema" | "object") => {
+    const body = {
+      model: openaiModel(),
+      temperature: 0.2,
+      max_tokens: opts.maxTokens ?? 8192,
+      messages: [
+        { role: "system", content: `${opts.system}
+Respond only with a JSON object matching this JSON schema:
+${JSON.stringify(schema)}` },
+        { role: "user", content: opts.prompt },
+      ],
+      response_format: mode === "schema" ? { type: "json_schema", json_schema: { name: "output", schema } } : { type: "json_object" },
+    };
+    try {
+      return await fetch(`${openaiUrl()}/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(process.env.OPENAI_API_KEY ? { authorization: `Bearer ${process.env.OPENAI_API_KEY}` } : {}) },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs()),
+      });
+    } catch (e) {
+      const err = e as Error;
+      if (err.name === "TimeoutError") throw new LlmError(`LLM API timed out after ${timeoutMs()}ms`);
+      throw new LlmError(`LLM API not reachable at ${hostOf(openaiUrl())} (${err.message})`);
+    }
+  };
+  let res = await send(objectMode ? "object" : "schema");
+  if (res.status === 400 && !objectMode) {
+    const text = await res.clone().text().catch(() => "");
+    if (/response_format|json_schema|structured/i.test(text)) res = await send("object");
   }
-  const parsed = opts.schema.safeParse(json);
-  if (!parsed.success) throw new LlmError("Output did not match the schema");
-  return { data: parsed.data as z.infer<S>, model: out.model, tokensIn: out.prompt_eval_count ?? 0, tokensOut: out.eval_count ?? 0, costUsd: 0 };
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const msg = `LLM API ${res.status}: ${text.slice(0, 200)}`;
+    throw res.status === 429 || res.status >= 500 ? new LlmError(msg) : new FatalLlmError(msg);
+  }
+  const out = (await res.json()) as { model?: string; choices?: { message?: { content?: string | null }; finish_reason?: string }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  const choice = out.choices?.[0];
+  if (choice?.finish_reason === "length") throw new LlmError("Output truncated (max_tokens)");
+  const tokensIn = out.usage?.prompt_tokens ?? 0;
+  const tokensOut = out.usage?.completion_tokens ?? 0;
+  return {
+    data: parseOutput(choice?.message?.content, opts.schema),
+    model: out.model || openaiModel(),
+    tokensIn,
+    tokensOut,
+    costUsd: (tokensIn * priceIn() + tokensOut * priceOut()) / 1_000_000,
+  };
 }
 
 export async function structured<S extends z.ZodType>(opts: StructuredOpts<S>): Promise<LlmResult<z.infer<S>> | null> {
@@ -135,7 +210,7 @@ export async function structured<S extends z.ZodType>(opts: StructuredOpts<S>): 
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
-      return p === "ollama" ? await callOllama(opts) : await callAnthropic(opts);
+      return p === "ollama" ? await callOllama(opts) : p === "openai" ? await callOpenAI(opts) : await callAnthropic(opts);
     } catch (e) {
       lastErr = e;
       if (e instanceof FatalLlmError) break; // not retryable
