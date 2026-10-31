@@ -52,7 +52,19 @@ export async function api<T = unknown>(path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
-export type State = ProjectState & { me: { id: string; name: string; color: string; title: string; role: string } };
+export interface Invite {
+  id: string;
+  token: string;
+  role: string;
+  uses: number;
+  createdById: string;
+  createdAt: string;
+}
+export type State = ProjectState & {
+  me: { id: string; name: string; color: string; title: string; role: string; email: string | null; demo: boolean };
+  /** Active invite links; empty for observers. */
+  invites: Invite[];
+};
 export type Presence = State["presence"][number];
 export type Lock = State["locks"][number];
 export interface Cursor {

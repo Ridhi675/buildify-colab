@@ -17,11 +17,11 @@ export function Button({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: "sm" | "md"; busy?: boolean }) {
   const [running, setRunning] = useState(false);
   const styles: Record<Variant, string> = {
-    primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm",
-    secondary: "bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 shadow-sm",
-    ghost: "text-slate-600 hover:bg-slate-100",
-    danger: "bg-white text-rose-700 border border-rose-200 hover:bg-rose-50",
-    success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
+    primary: "glow-btn bg-accent text-accent-foreground shadow-sm hover:brightness-110",
+    secondary: "bg-surface text-foreground border border-border shadow-xs hover:bg-muted",
+    ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
+    danger: "bg-surface text-rose-700 border border-rose-200 hover:bg-rose-50",
+    success: "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700",
   };
   const isBusy = busy || running;
   return (
@@ -41,8 +41,8 @@ export function Button({
         }
       }}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500",
-        size === "sm" ? "h-7 px-2.5 text-xs" : "h-9 px-3.5 text-sm",
+        "inline-flex items-center justify-center gap-1.5 rounded-full font-medium transition disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        size === "sm" ? "h-8 px-3 text-xs" : "h-10 px-4 text-sm",
         styles[variant],
         className,
       )}
@@ -55,7 +55,7 @@ export function Button({
 
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div {...rest} className={cn("rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]", className)}>
+    <div {...rest} className={cn("rounded-2xl border border-border bg-surface shadow-sm", className)}>
       {children}
     </div>
   );
@@ -63,12 +63,12 @@ export function Card({ className, children, ...rest }: React.HTMLAttributes<HTML
 
 export function CardHeader({ title, subtitle, icon, actions }: { title: ReactNode; subtitle?: ReactNode; icon?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+    <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
       <div className="flex min-w-0 items-start gap-2.5">
-        {icon && <div className="mt-0.5 text-slate-500">{icon}</div>}
+        {icon && <div className="mt-0.5 text-muted-foreground">{icon}</div>}
         <div className="min-w-0">
-          <div className="font-semibold text-slate-900">{title}</div>
-          {subtitle && <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>}
+          <div className="font-semibold tracking-tight text-foreground">{title}</div>
+          {subtitle && <div className="mt-0.5 text-xs text-muted-foreground">{subtitle}</div>}
         </div>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
@@ -77,8 +77,8 @@ export function CardHeader({ title, subtitle, icon, actions }: { title: ReactNod
 }
 
 const TONES = {
-  slate: "bg-slate-100 text-slate-700 ring-slate-200",
-  indigo: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+  slate: "bg-muted text-muted-foreground ring-border",
+  indigo: "bg-accent-soft text-accent ring-accent/20",
   emerald: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   amber: "bg-amber-50 text-amber-800 ring-amber-200",
   rose: "bg-rose-50 text-rose-700 ring-rose-200",
@@ -89,7 +89,7 @@ export type Tone = keyof typeof TONES;
 
 export function Badge({ tone = "slate", children, className, title }: { tone?: Tone; children: ReactNode; className?: string; title?: string }) {
   return (
-    <span title={title} className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset", TONES[tone], className)}>
+    <span title={title} className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset", TONES[tone], className)}>
       {children}
     </span>
   );
@@ -111,13 +111,13 @@ export function Avatar({ name, color, size = 28, online, ring }: { name: string;
   return (
     <span className="relative inline-flex shrink-0" title={`${name}${online === undefined ? "" : online ? " — online" : " — offline"}`}>
       <span
-        className={cn("inline-flex items-center justify-center rounded-full font-semibold text-white", ring && "ring-2 ring-white")}
+        className={cn("inline-flex items-center justify-center rounded-full font-semibold text-white", ring && "ring-2 ring-surface")}
         style={{ width: size, height: size, background: color, fontSize: size * 0.38 }}
       >
         {initials}
       </span>
       {online !== undefined && (
-        <span className={cn("absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white", online ? "bg-emerald-500" : "bg-slate-300")} />
+        <span className={cn("absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface", online ? "bg-emerald-500" : "bg-border-strong")} />
       )}
     </span>
   );
@@ -132,15 +132,15 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-[8vh]" onMouseDown={onClose}>
-      <div role="dialog" aria-modal className={cn("animate-in w-full rounded-2xl bg-white shadow-2xl", wide ? "max-w-4xl" : "max-w-lg")} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
-          <div className="font-semibold">{title}</div>
-          <button aria-label="Close" onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay p-4 pt-[8vh] backdrop-blur-sm" onMouseDown={onClose}>
+      <div role="dialog" aria-modal className={cn("animate-in w-full rounded-3xl border border-border bg-surface text-foreground shadow-lg", wide ? "max-w-4xl" : "max-w-lg")} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="font-semibold tracking-tight">{title}</div>
+          <button aria-label="Close" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
             <X size={16} />
           </button>
         </div>
-        <div className="max-h-[75vh] overflow-y-auto p-5 scroll-thin">{children}</div>
+        <div data-lenis-prevent className="max-h-[75vh] overflow-y-auto p-6 scroll-thin">{children}</div>
       </div>
     </div>
   );
@@ -148,10 +148,10 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
 
 export function Empty({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-6 py-10 text-center">
-      {icon && <div className="text-slate-400">{icon}</div>}
-      <div className="font-medium text-slate-700">{title}</div>
-      {children && <div className="max-w-md text-sm text-slate-500">{children}</div>}
+    <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border px-6 py-10 text-center">
+      {icon && <div className="text-muted-foreground/70">{icon}</div>}
+      <div className="font-medium text-foreground">{title}</div>
+      {children && <div className="max-w-md text-sm text-muted-foreground">{children}</div>}
     </div>
   );
 }
@@ -159,26 +159,26 @@ export function Empty({ icon, title, children }: { icon?: ReactNode; title: stri
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="block">
-      <div className="mb-1 text-xs font-medium text-slate-600">{label}</div>
+      <div className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</div>
       {children}
-      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
     </label>
   );
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
+  "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground shadow-xs outline-none transition placeholder:text-muted-foreground/70 focus:border-accent/50 focus:ring-4 focus:ring-accent/10";
 
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[] }) {
   return (
-    <div className="inline-flex rounded-lg bg-slate-100 p-0.5" role="tablist">
+    <div className="inline-flex rounded-full bg-muted p-1" role="tablist">
       {items.map((i) => (
         <button
           key={i.value}
           role="tab"
           aria-selected={value === i.value}
           onClick={() => onChange(i.value)}
-          className={cn("rounded-md px-2.5 py-1 text-xs font-medium transition", value === i.value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900")}
+          className={cn("rounded-full px-3 py-1 text-xs font-medium transition", value === i.value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
         >
           {i.label}
         </button>

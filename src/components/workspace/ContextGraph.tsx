@@ -96,7 +96,8 @@ export function ContextGraph({
         position: { x: col * 260, y: row * 58 },
         data: { label: n.label, g: n },
         style: {
-          background: hot ? "#fef3c7" : c.bg,
+          background: hot ? "color-mix(in oklab, #f59e0b 22%, var(--surface))" : `color-mix(in oklab, ${c.border} 13%, var(--surface))`,
+          color: "var(--foreground)",
           border: `${hot ? 2.5 : 1.5}px solid ${hot ? "#f59e0b" : c.border}`,
           borderRadius: 10,
           fontSize: 11,
@@ -117,18 +118,19 @@ export function ContextGraph({
           source: e.s,
           target: e.t,
           label: e.label,
-          labelStyle: { fontSize: 9, fill: "#64748b" },
-          style: { stroke: hot ? "#f59e0b" : e.label === "invalidates" ? "#e11d48" : "#cbd5e1", strokeWidth: hot ? 2 : 1, strokeDasharray: e.dashed ? "4 3" : undefined, opacity: dim && highlight && !hot ? 0.25 : 1 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: hot ? "#f59e0b" : "#94a3b8" },
+          labelStyle: { fontSize: 9, fill: "var(--muted-foreground)" },
+          labelBgStyle: { fill: "var(--surface)" },
+          style: { stroke: hot ? "#f59e0b" : e.label === "invalidates" ? "#e11d48" : "var(--border-strong)", strokeWidth: hot ? 2 : 1, strokeDasharray: e.dashed ? "4 3" : undefined, opacity: dim && highlight && !hot ? 0.25 : 1 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: hot ? "#f59e0b" : "var(--muted-foreground)" },
         };
       });
     return { rfNodes, rfEdges };
   }, [nodes, edges, highlight, dim]);
 
   return (
-    <div style={{ height }} className="rounded-xl border border-slate-200 bg-white">
+    <div style={{ height }} className="rounded-xl border border-slate-200 bg-surface">
       <ReactFlow nodes={rf.rfNodes} edges={rf.rfEdges} fitView fitViewOptions={{ padding: 0.05 }} minZoom={0.2} onNodeClick={(_, n) => onSelect?.((n.data as { g: GNode }).g)} proOptions={{ hideAttribution: true }} nodesConnectable={false}>
-        <Background gap={18} color="#eef2f7" />
+        <Background gap={18} color="var(--border)" />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>
@@ -139,7 +141,7 @@ export function Legend() {
   return (
     <div className="flex flex-wrap gap-2 text-[11px] text-slate-600">
       {Object.entries(COLORS).map(([k, c]) => (
-        <span key={k} className="flex items-center gap-1"><span className="h-3 w-3 rounded" style={{ background: c.bg, border: `1.5px solid ${c.border}` }} />{k}</span>
+        <span key={k} className="flex items-center gap-1"><span className="h-3 w-3 rounded" style={{ background: `color-mix(in oklab, ${c.border} 13%, var(--surface))`, border: `1.5px solid ${c.border}` }} />{k}</span>
       ))}
     </div>
   );

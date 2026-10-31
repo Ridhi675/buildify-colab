@@ -8,7 +8,7 @@
 | 4 Context reliability | Done | Immutable context versions, dependency fingerprints, stale quarantine, conflict preservation + rebase, checkpoints, restart/recovery, orphan reconciliation |
 | 5 Flagship | Done | Ripple Effect (deterministic + inferred), React Flow graphs, Decision Time Machine, compare, safe restore |
 | 6 Advanced collaboration | Done | Agent Control Centre (pause/resume/stop/redirect/retry/delegate/inspect/restart), comments + @mentions, grouped notifications, shortcuts |
-| 7 Finalization | Partial | 27 automated tests pass; demo verified live in two browser tabs; docs written. Not deployed (no URL claimed). |
+| 7 Finalization | Partial | 36 automated tests pass; demo verified live in two browser tabs; docs written. Deployed on Render free tier (https://rebrix.onrender.com) with gpt-oss-120b on Groq; only the Reviewer simplification step verified live there. |
 
 ## Verified manually (2026-10-31)
 Full 17-step demo in two tabs (Aisha + Daniel): request → simplification → approvals → preview gate → parallel agents → mid-flight change → ripple → quarantine → Builder restart/recovery → rebuild → validation → approval → v2 → compare → restore (v3 derived from v1).

@@ -39,7 +39,7 @@ export function PreviewStudio() {
         />
         <div className="flex flex-wrap items-center gap-2 p-4">
           {previews.map((p) => (
-            <button key={p.id} onClick={() => setSelId(p.id)} className={cn("flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs", sel?.id === p.id ? "border-indigo-400 bg-indigo-50" : "border-slate-200 bg-white")}>
+            <button key={p.id} onClick={() => setSelId(p.id)} className={cn("flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs", sel?.id === p.id ? "border-indigo-400 bg-indigo-50" : "border-slate-200 bg-surface")}>
               Preview #{p.number} <StatusBadge status={p.status} />
             </button>
           ))}

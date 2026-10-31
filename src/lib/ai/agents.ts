@@ -1,4 +1,4 @@
-// Reviewer AI and Builder AI capabilities. Each function tries the configured LLM
+// Reviewer (Bunty) and Builder (Babli) capabilities. Each function tries the configured LLM
 // first and falls back to the deterministic rules engine. The returned `source`
 // tells the UI which one produced the result — never presented as something else.
 
@@ -39,7 +39,7 @@ async function withFallback<T>(llm: () => Promise<LlmResult<T> | null>, rules: (
 }
 
 const REVIEWER_SYSTEM =
-  "You are the Reviewer AI in Buildify CoLab, a product-building workspace shared by two humans and a Builder AI. " +
+  "You are Bunty, the AI Strategist (reviewer and coordinator) in ReBrix, a product-building workspace shared by two humans and Babli, the AI Builder. " +
   "You turn human requests into precise, testable product requirements, explain things in plain language for non-technical readers, " +
   "and never claim a human approved something. Preserve the human's original intent; flag ambiguity instead of guessing.";
 
@@ -150,7 +150,7 @@ export function buildPlan(reqs: ReqLite[], components: { key: string; name: stri
   return withFallback(
     () =>
       structured({
-        system: "You are the Builder AI. You only implement approved specifications and report structured, honest progress.",
+        system: "You are Babli, the AI Builder. You only implement approved specifications and report structured, honest progress.",
         schema: BuildPlanSchema,
         prompt: `Write a technical implementation plan (one step per component that needs work) for these approved requirements:\n${JSON.stringify(approved.map(({ key, title, components }) => ({ key, title, components })))}\nComponents:\n${JSON.stringify(components)}`,
       }),
@@ -180,7 +180,7 @@ export async function generateSpec(reqs: ReqLite[], appName: string, onlyKeys?: 
   const out = await withFallback(
     () =>
       structured({
-        system: "You are the Builder AI. Write concise, realistic UI copy for each component. Keep the same keys. Honor every approved requirement.",
+        system: "You are Babli, the AI Builder. Write concise, realistic UI copy for each component. Keep the same keys. Honor every approved requirement.",
         schema: CopySchema,
         prompt:
           `Approved requirements:\n${JSON.stringify(reqs.filter((r) => r.status === "approved").map(({ key, title, description }) => ({ key, title, description })))}\n` +

@@ -28,7 +28,10 @@ npm run setup
 npm run dev
 ```
 
-Open http://localhost:3000, pick **Aisha (Founder)**. Open a second tab or browser, pick **Daniel (Designer)**. Open **CareConnect** in both — the demo guide in the corner walks through all 17 steps and ticks them off from live state.
+Open http://localhost:3000 and either:
+
+- **Use your own account** — create an account, create a project, then click **Invite** in the workspace to copy a link for a teammate. They open it on their own computer, sign in or sign up, and join with the role you picked (founder, designer or observer).
+- **Try the demo** — under "Or explore the CareConnect demo as", pick **Aisha (Founder)**. Open a second tab or browser, pick **Daniel (Designer)**. Open **CareConnect** in both — the demo guide in the corner walks through all 17 steps and ticks them off from live state. Demo people are shared by everyone and cannot join real projects.
 
 - No `ANTHROPIC_API_KEY` or Ollama? Everything still works: agents use a deterministic rules engine and every output is labelled **Rules engine**. Set the key, or `LLM_PROVIDER="ollama"` for local open-weight models (see below), to switch to the LLM (labelled **LLM**).
 - Reset the demo at any time from the demo guide (or `npm run db:seed`).
@@ -39,7 +42,7 @@ Open http://localhost:3000, pick **Aisha (Founder)**. Open a second tab or brows
 npm test
 ```
 
-27 tests: LLM adapter tests (Ollama provider with a stubbed server), engine unit tests (simplification, fingerprints, stale detection, ripple traversal, impact-aware rebuild) and a full demo scenario against a real SQLite DB using the real task runner (two-human approval gate, observer permissions, parallel agents, mid-flight change, quarantine, conflict detection, restart/recovery, rebuild/validation/approval, compare, safe restore, pause/resume/stop).
+36 tests: LLM adapter tests (Ollama and OpenAI-compatible providers with a stubbed server), accounts and invite links (password hashing, sign-up/sign-in, invite join/revoke, observer and demo restrictions), engine unit tests (simplification, fingerprints, stale detection, ripple traversal, impact-aware rebuild) and a full demo scenario against a real SQLite DB using the real task runner (two-human approval gate, observer permissions, parallel agents, mid-flight change, quarantine, conflict detection, restart/recovery, rebuild/validation/approval, compare, safe restore, pause/resume/stop).
 
 ## Architecture
 
@@ -78,7 +81,7 @@ More: [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md), [docs/DEMO_SCRIPT.md](do
 | Variable | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `file:./dev.db` | SQLite path (relative to `prisma/`) or a Postgres URL |
-| `AUTH_SECRET` | — | HMAC secret for demo session tokens |
+| `AUTH_SECRET` | — | HMAC secret for session tokens. **Required in production** — the server refuses to sign in without it |
 | `LLM_PROVIDER` | empty | `anthropic`, `ollama`, `openai` (any OpenAI-compatible API), or empty (Anthropic when a key is set, else rules engine) |
 | `ANTHROPIC_API_KEY` | empty | Enables the Anthropic LLM path |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5` if unset | Model id |
@@ -115,22 +118,31 @@ Change `provider = "sqlite"` to `"postgresql"` in `prisma/schema.prisma`, set `D
 
 The app needs a **long-running Node process** (SSE connections and in-process agent jobs), so serverless platforms are not a fit. The repo ships a `Dockerfile` (works on Railway, Render, Fly.io) and `railway.json`.
 
+**Render** (free tier works)
+1. New → Web Service → connect this repo → Language: Docker, Branch: `main`, Instance: Free. Render sets `PORT` itself.
+2. Environment: `AUTH_SECRET` (long random string, required) and an AI provider (below). Do not use "Add from .env" — your local `.env` points at Ollama on your laptop; `.dockerignore` keeps it out of the image on purpose.
+3. Free instances sleep after ~15 min idle (about a minute to wake) and have no persistent disk, so the demo is re-seeded on every deploy or restart.
+
 **Railway**
-1. New Project → Deploy from GitHub repo → pick this repo. Railway builds the `Dockerfile`.
-2. Variables: `AUTH_SECRET` (long random string) and an AI provider (below). Do not copy your local `.env` — `.dockerignore` keeps it out of the image on purpose.
-3. Optional: add a Volume mounted at `/data` so the SQLite database (`/data/buildify.db`) survives redeploys. Without it the demo is re-seeded on every deploy.
+1. New Project → Deploy from GitHub repo → pick this repo. Railway builds the `Dockerfile` (`railway.json` pins one replica).
+2. Variables: `AUTH_SECRET` and an AI provider, as above.
+3. Optional: add a Volume mounted at `/data` so the SQLite database (`/data/buildify.db`) survives redeploys.
 4. Settings → Networking → Generate Domain for the public URL.
 
-On start, `scripts/start.sh` syncs the schema (`prisma db push`), seeds the CareConnect demo only if it is missing (`scripts/seed-if-empty.ts`), then runs `next start` on `$PORT`.
+On start, `scripts/start.sh` syncs the schema (`prisma db push`), seeds the CareConnect demo only if it is missing (`scripts/seed-if-empty.ts`), then runs `next start` on `$PORT`. Serve over HTTPS (both hosts do by default) so passwords and session tokens are encrypted in transit.
+
+**Existing databases.** On a database created before accounts existed, Prisma asks to confirm adding the unique `email` column; existing users have no email, so `npx prisma db push --accept-data-loss` is safe for that one change. Fresh databases (Render free tier, new volumes) are unaffected.
 
 **AI on a deployed server.** A server cannot reach Ollama on your laptop. Use a hosted open-weight model through an OpenAI-compatible API, e.g. Groq:
-`LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://api.groq.com/openai/v1`, `OPENAI_API_KEY=…`, `OPENAI_MODEL=<model id>`, plus `BC_PRICE_IN_PER_MTOK` / `BC_PRICE_OUT_PER_MTOK` for cost tracking. Or leave `LLM_PROVIDER` empty to use the labelled rules engine.
+`LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://api.groq.com/openai/v1`, `OPENAI_API_KEY=…`, `OPENAI_MODEL=openai/gpt-oss-120b`, plus `BC_PRICE_IN_PER_MTOK` / `BC_PRICE_OUT_PER_MTOK` for cost tracking (`0` on a free tier). Or leave `LLM_PROVIDER` empty to use the labelled rules engine.
+
+Without Docker: build `npm ci && npx prisma db push && npm run build`, start `npm start`, then `npm run db:seed` once.
 
 Run a single instance — the realtime hub is in-memory. No public deployment has been made from this repository yet.
 
 ## Security notes
 
-Project membership is checked on every API route; inputs are validated with Zod; observers are read/comment-only; AI agents cannot vote; retries and timeouts are bounded; cancellation is cooperative and late outputs are rejected; all state changes run in transactions and are written to an audit log. Demo identities are not real authentication.
+Project membership is checked on every API route; inputs are validated with Zod; observers are read/comment-only; AI agents cannot vote; retries and timeouts are bounded; cancellation is cooperative and late outputs are rejected; all state changes run in transactions and are written to an audit log. Accounts use email + password (scrypt-hashed, never sent to the browser) with a small per-email lockout after repeated failures; sessions are HMAC-signed tokens kept in the browser, so each computer signs in separately. Invite links add the person who opens them with a fixed role, can be revoked, and are hidden from observers. The seeded demo people have no password and are limited to the demo; there is no email verification or password reset yet.
 
 ## Developer tooling
 

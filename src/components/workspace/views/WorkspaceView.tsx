@@ -1,10 +1,11 @@
 "use client";
 
-import { Check, Edit3, FileText, Lock, MessageSquare, Pencil, Plus, Sparkles, Wand2, X } from "lucide-react";
-import { useState } from "react";
+import { ArrowUp, Check, ChevronLeft, ChevronRight, Edit3, FileText, Lock, MessageSquare, Pencil, Plus, Sparkles, Wand2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { AppSpec, SpecComponent } from "@/lib/types";
 import { AppRenderer } from "../../AppRenderer";
 import { cn, timeAgo, type State } from "../../client";
+import { agentColor, onGlowMove, OrbitLogo } from "../../effects";
 import { Avatar, Badge, Button, Card, CardHeader, Empty, Field, inputCls, Modal, SourceBadge, StatusBadge, Tabs } from "../../ui";
 import { Comments, useNames, useWs } from "../shared";
 
@@ -14,7 +15,7 @@ export function WorkspaceView() {
   const { state } = useWs();
   const current = state.versions.find((v) => v.id === state.project.currentArtifactVerId);
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="mx-auto max-w-5xl space-y-6">
       <RequestPanel />
       <RequirementsBoard />
       {current ? <Canvas spec={current.spec as AppSpec} label={`Shared product · artifact v${current.number}`} changed={current.changedComponents} /> : (
@@ -33,28 +34,55 @@ function RequestPanel() {
   const running = simplify.find((t) => t.status === "running" || t.status === "queued");
   const requests = [...new Set(state.requirements.map((r) => r.originalRequest).filter(Boolean))] as string[];
   const readOnly = state.me.role === "observer";
+  const actors = [...state.members.map((m) => m.color), ...state.agents.map((a) => agentColor(a.key))];
+  const submit = async () => {
+    await run({ type: "submit_request", request: text }, "Sent to Bunty");
+    setText("");
+  };
   return (
-    <Card>
-      <CardHeader icon={<Sparkles size={16} />} title="Describe the product" subtitle="Plain language is fine — the Reviewer AI turns it into structured, testable requirements you can edit or reject." />
-      <div className="space-y-3 p-4">
-        <textarea
-          className={cn(inputCls, "min-h-[76px]")}
-          placeholder="e.g. Build a healthcare app for elderly users. Make it easy to navigate and lightweight."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          disabled={readOnly}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" disabled={!text.trim() || readOnly} onClick={async () => { await run({ type: "submit_request", request: text }, "Sent to Reviewer AI"); setText(""); }}>
-            <Wand2 size={15} /> Simplify with Reviewer AI
-          </Button>
-          {state.project.isDemo && !requests.length && (
-            <Button variant="ghost" onClick={() => setText("Build a healthcare appointment-booking app where patients pick a doctor and a time slot and get reminders. Desktop-first web app with a dark visual theme.")}>Use demo request</Button>
-          )}
-          {running && <Badge tone="indigo"><span className="animate-pulse-soft">●</span> Reviewer: {running.phaseLabel}</Badge>}
-        </div>
+    <section className="relative overflow-hidden rounded-[2rem] border border-border bg-surface/80 px-5 pb-6 pt-10 shadow-md backdrop-blur-xl sm:px-10">
+      {/* Soft backdrop: grid + slow colour drift, decorative only. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="aurora glow-1 -left-16 -top-24 h-72 w-72" />
+        <div className="aurora glow-2 -right-10 -top-20 h-64 w-80" />
+        <div className="absolute inset-0 overflow-hidden"><div className="bg-grid bg-grid-drift" /></div>
       </div>
-    </Card>
+      <div className="relative mx-auto flex max-w-2xl flex-col items-center text-center">
+        <OrbitLogo colors={actors} size={92} />
+        <h2 className="mt-6 text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-4xl">Describe the product</h2>
+        <p className="mt-2 max-w-lg text-sm text-muted-foreground">Plain language is fine — Bunty turns it into structured, testable requirements you can edit or reject.</p>
+
+        <div className="glow-card mt-7 w-full rounded-3xl border border-border bg-surface text-left shadow-md" onPointerMove={onGlowMove}>
+          <textarea
+            className="block min-h-[96px] w-full resize-none rounded-t-3xl bg-transparent px-5 pt-5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70 disabled:cursor-not-allowed"
+            placeholder="e.g. Build a healthcare app for elderly users. Make it easy to navigate and lightweight."
+            aria-label="Describe the product"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim() && !readOnly) void submit();
+            }}
+            disabled={readOnly}
+          />
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-4 pt-2">
+            {state.project.isDemo && !requests.length && (
+              <button
+                type="button"
+                onClick={() => setText("Build a healthcare appointment-booking app where patients pick a doctor and a time slot and get reminders. Desktop-first web app with a dark visual theme.")}
+                className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-border-strong hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                Use demo request
+              </button>
+            )}
+            {running && <Badge tone="indigo"><span className="animate-pulse-soft">●</span> Bunty: {running.phaseLabel}</Badge>}
+            <Button variant="primary" className="ml-auto" disabled={!text.trim() || readOnly} onClick={submit}>
+              <Wand2 size={15} /> Simplify with Bunty <ArrowUp size={15} />
+            </Button>
+          </div>
+        </div>
+        <div className="mt-3 text-[11px] text-muted-foreground">Ctrl/Cmd + Enter to send</div>
+      </div>
+    </section>
   );
 }
 
@@ -89,11 +117,11 @@ function RequirementsBoard() {
           <div className="mb-3 grid gap-4 lg:grid-cols-[1fr_2fr]">
             <div>
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Original request</div>
-              {requests.map((q, i) => <blockquote key={i} className="rounded-lg border-l-4 border-indigo-300 bg-white p-3 text-sm italic text-slate-700">“{q}”</blockquote>)}
+              {requests.map((q, i) => <blockquote key={i} className="rounded-lg border-l-4 border-indigo-300 bg-surface p-3 text-sm italic text-slate-700">“{q}”</blockquote>)}
             </div>
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reviewer AI interpretation</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bunty's interpretation</span>
                 {!readOnly && <Button size="sm" variant="success" onClick={() => run({ type: "decide_requirements", keys: proposed.map((r) => r.key), decision: "approve" }, "Requirements approved")}><Check size={12} /> Approve all</Button>}
               </div>
               <div className="space-y-2">
@@ -115,14 +143,20 @@ function RequirementsBoard() {
       )}
       <div className="space-y-2 p-4">
         {approved.length === 0 && !proposed.length && <Empty title="No requirements yet">Describe the product above to get started.</Empty>}
-        {approved.map((r) => {
-          const lock = locks.find((l) => l.target === r.key && l.userId !== state.me.id);
-          return (
-            <ReqRow key={r.id} r={r} lock={lock?.name}>
-              {!readOnly && <Button size="sm" onClick={() => openChange(r)}><Edit3 size={12} /> Propose change</Button>}
-            </ReqRow>
-          );
-        })}
+        {approved.length > 0 && (
+          <ReqCarousel count={approved.length}>
+            {approved.map((r) => {
+              const lock = locks.find((l) => l.target === r.key && l.userId !== state.me.id);
+              return (
+                <div key={r.id} data-card className="w-[min(82vw,340px)] shrink-0 snap-start">
+                  <ReqRow r={r} lock={lock?.name} card>
+                    {!readOnly && <Button size="sm" onClick={() => openChange(r)}><Edit3 size={12} /> Propose change</Button>}
+                  </ReqRow>
+                </div>
+              );
+            })}
+          </ReqCarousel>
+        )}
         {state.requirements.some((r) => r.status === "rejected") && (
           <div className="pt-2 text-xs text-slate-400">Rejected: {state.requirements.filter((r) => r.status === "rejected").map((r) => `${r.key} ${r.title}`).join(" · ")}</div>
         )}
@@ -134,13 +168,13 @@ function RequirementsBoard() {
   );
 }
 
-function ReqRow({ r, children, lock }: { r: Req; children?: React.ReactNode; lock?: string }) {
+function ReqRow({ r, children, lock, card }: { r: Req; children?: React.ReactNode; lock?: string; card?: boolean }) {
   const name = useNames();
   const [open, setOpen] = useState(false);
   const author = name(r.authorId);
   return (
-    <div className={cn("rounded-lg border bg-white p-3", lock ? "border-rose-300" : "border-slate-200")}>
-      <div className="flex items-start gap-3">
+    <div className={cn("rounded-lg border bg-surface p-3", card && "flex h-full flex-col rounded-2xl p-4", lock ? "border-rose-300" : "border-slate-200")}>
+      <div className={cn("flex items-start gap-3", card && "flex-1 flex-col gap-2")}>
         <span className="mt-0.5 font-mono text-[11px] text-slate-400">{r.key}</span>
         <button className="min-w-0 flex-1 text-left" onClick={() => setOpen((o) => !o)}>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -152,11 +186,11 @@ function ReqRow({ r, children, lock }: { r: Req; children?: React.ReactNode; loc
           </div>
           <div className="mt-0.5 text-sm text-slate-600">{r.description}</div>
         </button>
-        <div className="flex shrink-0 gap-1">{children}</div>
+        <div className={cn("flex shrink-0 gap-1", card && "mt-auto pt-1")}>{children}</div>
       </div>
       {lock && <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-rose-700"><Lock size={12} /> {lock} is currently editing {r.key}</div>}
       {open && (
-        <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 text-xs sm:grid-cols-2">
+        <div className={cn("mt-3 grid gap-3 border-t border-slate-100 pt-3 text-xs", !card && "sm:grid-cols-2")}>
           <div>
             <div className="mb-1 font-semibold text-slate-500">Acceptance criteria</div>
             <ul className="list-disc space-y-0.5 pl-4 text-slate-700">{r.acceptanceCriteria.map((a, i) => <li key={i}>{a}</li>)}</ul>
@@ -169,6 +203,71 @@ function ReqRow({ r, children, lock }: { r: Req; children?: React.ReactNode; loc
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Horizontal row of requirement cards. Left/right arrow keys and the mouse
+ * wheel move along the row; up/down arrows are left alone so the page scrolls.
+ * At either end the wheel hands scrolling back to the page.
+ */
+function ReqCarousel({ count, children }: { count: number; children: React.ReactNode }) {
+  const row = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ start: true, end: false });
+
+  const step = () => {
+    const card = row.current?.querySelector<HTMLElement>("[data-card]");
+    return card ? card.offsetWidth + 12 : 320;
+  };
+  const by = (dir: 1 | -1) => row.current?.scrollBy({ left: dir * step(), behavior: "smooth" });
+
+  useEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    const update = () => setEdge({ start: el.scrollLeft <= 2, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 2 });
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const atStart = el.scrollLeft <= 0 && e.deltaY < 0;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1 && e.deltaY > 0;
+      if (atStart || atEnd) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    el.addEventListener("wheel", wheel, { passive: false });
+    window.addEventListener("resize", update);
+    return () => {
+      el.removeEventListener("scroll", update);
+      el.removeEventListener("wheel", wheel);
+      window.removeEventListener("resize", update);
+    };
+  }, [count]);
+
+  return (
+    <div className="relative">
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{count} approved · use ← → or scroll to move along</span>
+        <span className="flex gap-1">
+          <Button size="sm" variant="ghost" aria-label="Previous requirements" disabled={edge.start} onClick={() => by(-1)}><ChevronLeft size={14} /></Button>
+          <Button size="sm" variant="ghost" aria-label="Next requirements" disabled={edge.end} onClick={() => by(1)}><ChevronRight size={14} /></Button>
+        </span>
+      </div>
+      <div
+        ref={row}
+        role="region"
+        aria-label="Approved requirements"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget && (e.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
+          if (e.key === "ArrowRight") (e.preventDefault(), by(1));
+          if (e.key === "ArrowLeft") (e.preventDefault(), by(-1));
+        }}
+        className="scroll-thin -mx-1 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-1 pb-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+      >
+        {children}
+      </div>
     </div>
   );
 }

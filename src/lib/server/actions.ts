@@ -9,6 +9,7 @@ import * as wf from "./workflow";
 import { resetDemo, DEMO_ID } from "./seed";
 import { HttpError } from "./auth";
 import { db } from "../db";
+import { createInvite, revokeInvite, ROLES } from "./accounts";
 
 const id = z.string().min(1).max(64);
 const text = (max = 2000) => z.string().trim().min(1).max(max);
@@ -40,6 +41,8 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("set_policy"), major: z.number().int().min(1).max(2), minor: z.number().int().min(1).max(2), release: z.number().int().min(1).max(2) }),
   z.object({ type: z.literal("mark_read") }),
   z.object({ type: z.literal("reset_demo") }),
+  z.object({ type: z.literal("create_invite"), role: z.enum(ROLES) }),
+  z.object({ type: z.literal("revoke_invite"), inviteId: id }),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 
@@ -87,6 +90,8 @@ export async function dispatch(projectId: string, user: { id: string; name: stri
     case "mark_read":
       await wf.markRead(projectId, user.id);
       return { ok: true };
+    case "create_invite": return createInvite(projectId, actor, a.role);
+    case "revoke_invite": return revokeInvite(projectId, actor, a.inviteId);
     case "reset_demo": {
       if (projectId !== DEMO_ID) throw new HttpError(400, "Only the demo project can be reset");
       // Bump epochs so in-flight runners cannot commit into the fresh project.

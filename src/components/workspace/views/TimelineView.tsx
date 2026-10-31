@@ -38,7 +38,7 @@ export function TimelineView() {
         <div className="flex gap-3 overflow-x-auto p-4 scroll-thin">
           {versions.map((v, i) => (
             <div key={v.id} className="flex items-center gap-3">
-              <button onClick={() => setSelId(v.id)} className={cn("w-56 shrink-0 rounded-xl border p-3 text-left transition", sel?.id === v.id ? "border-indigo-400 bg-indigo-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300")}>
+              <button onClick={() => setSelId(v.id)} className={cn("w-56 shrink-0 rounded-xl border p-3 text-left transition", sel?.id === v.id ? "border-indigo-400 bg-indigo-50 shadow-sm" : "border-slate-200 bg-surface hover:border-slate-300")}>
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-bold">v{v.number}</span>
                   {v.id === state.project.currentArtifactVerId ? <Badge tone="emerald">current</Badge> : <Badge>historical</Badge>}
@@ -76,7 +76,7 @@ function DecisionList({ onOpen }: { onOpen: (d: Decision) => void }) {
           const v = state.versions.find((x) => x.decisionId === d.id);
           return (
             <li key={d.id} className="relative border-l-2 border-slate-200 pb-4 pl-4 last:pb-0">
-              <span className={cn("absolute -left-[7px] top-1 h-3 w-3 rounded-full ring-2 ring-white", d.kind === "change" ? "bg-amber-500" : d.kind === "restore" ? "bg-violet-500" : d.kind === "release" ? "bg-emerald-600" : "bg-indigo-500")} />
+              <span className={cn("absolute -left-[7px] top-1 h-3 w-3 rounded-full ring-2 ring-surface", d.kind === "change" ? "bg-amber-500" : d.kind === "restore" ? "bg-violet-500" : d.kind === "release" ? "bg-emerald-600" : "bg-indigo-500")} />
               <button onClick={() => onOpen(d)} className="w-full text-left">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="font-medium text-slate-900">{d.title}</span>
