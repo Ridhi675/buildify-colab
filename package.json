@@ -11,6 +11,7 @@
     "test": "vitest run",
     "db:push": "prisma db push",
     "db:seed": "tsx scripts/seed.ts",
+    "llm:check": "tsx --env-file=.env scripts/check-llm.ts",
     "setup": "prisma db push && tsx scripts/seed.ts",
     "postinstall": "prisma generate"
   },

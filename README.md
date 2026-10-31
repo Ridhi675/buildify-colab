@@ -30,7 +30,7 @@ npm run dev
 
 Open http://localhost:3000, pick **Aisha (Founder)**. Open a second tab or browser, pick **Daniel (Designer)**. Open **CareConnect** in both — the demo guide in the corner walks through all 17 steps and ticks them off from live state.
 
-- No `ANTHROPIC_API_KEY`? Everything still works: agents use a deterministic rules engine and every output is labelled **Rules engine**. Set the key to switch to the LLM (labelled **LLM**).
+- No `ANTHROPIC_API_KEY` or Ollama? Everything still works: agents use a deterministic rules engine and every output is labelled **Rules engine**. Set the key, or `LLM_PROVIDER="ollama"` for local open-weight models (see below), to switch to the LLM (labelled **LLM**).
 - Reset the demo at any time from the demo guide (or `npm run db:seed`).
 
 ## Tests
@@ -39,7 +39,7 @@ Open http://localhost:3000, pick **Aisha (Founder)**. Open a second tab or brows
 npm test
 ```
 
-20 tests: engine unit tests (simplification, fingerprints, stale detection, ripple traversal, impact-aware rebuild) and a full demo scenario against a real SQLite DB using the real task runner (two-human approval gate, observer permissions, parallel agents, mid-flight change, quarantine, conflict detection, restart/recovery, rebuild/validation/approval, compare, safe restore, pause/resume/stop).
+27 tests: LLM adapter tests (Ollama provider with a stubbed server), engine unit tests (simplification, fingerprints, stale detection, ripple traversal, impact-aware rebuild) and a full demo scenario against a real SQLite DB using the real task runner (two-human approval gate, observer permissions, parallel agents, mid-flight change, quarantine, conflict detection, restart/recovery, rebuild/validation/approval, compare, safe restore, pause/resume/stop).
 
 ## Architecture
 
@@ -56,7 +56,7 @@ flowchart LR
     WF --> RUN[Agent task runner<br/>safe boundaries · epochs · pause/stop]
     RUN --> REV[Reviewer AI]
     RUN --> BLD[Builder AI]
-    REV & BLD --> LLM[LLM adapter<br/>Anthropic structured output]
+    REV & BLD --> LLM[LLM adapter<br/>Anthropic / Ollama structured output]
     REV & BLD --> RULES[Deterministic engine<br/>spec · impact · stale check]
     WF --> HUB[Realtime hub<br/>presence · locks]
   end
@@ -79,15 +79,31 @@ More: [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md), [docs/DEMO_SCRIPT.md](do
 |---|---|---|
 | `DATABASE_URL` | `file:./dev.db` | SQLite path (relative to `prisma/`) or a Postgres URL |
 | `AUTH_SECRET` | — | HMAC secret for demo session tokens |
-| `ANTHROPIC_API_KEY` | empty | Enables the LLM path |
+| `LLM_PROVIDER` | empty | `anthropic`, `ollama`, or empty (Anthropic when a key is set, else rules engine) |
+| `ANTHROPIC_API_KEY` | empty | Enables the Anthropic LLM path |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5` if unset | Model id |
 | `BC_LLM_EFFORT` | `medium` | Effort level for LLM calls |
-| `BC_PRICE_IN_PER_MTOK` / `BC_PRICE_OUT_PER_MTOK` | 2 / 10 | Cost estimate pricing |
+| `BC_PRICE_IN_PER_MTOK` / `BC_PRICE_OUT_PER_MTOK` | 2 / 10 | Cost estimate pricing (Anthropic only; Ollama is $0) |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server |
+| `OLLAMA_MODEL` | `qwen3:8b` | Local model tag (must be pulled first) |
+| `OLLAMA_NUM_CTX` | 8192 | Context window for Ollama calls |
+| `OLLAMA_THINK` | unset | `false` disables thinking on reasoning models (faster) |
+| `OLLAMA_KEEP_ALIVE` | `30m` | How long Ollama keeps the model loaded |
 | `BC_AGENT_STEP_MS` | 2500 | Pacing per agent phase (demo visibility) |
 | `BC_BUILD_PACING` | 5 | Multiplier for full builds, so humans can change requirements mid-flight |
 | `BC_TASK_TIMEOUT_MS` / `BC_LLM_TIMEOUT_MS` | 120000 / 60000 | Timeouts |
 
 LLM calls use `client.beta.messages.parse` with a Zod schema, bounded retries, a timeout, refusal handling and the server-side `fallbacks: "default"` option.
+
+### Local models with Ollama
+
+Install [Ollama](https://ollama.com), pull a model, and point the app at it:
+
+```bash
+ollama pull qwen3:8b
+```
+
+Then set `LLM_PROVIDER="ollama"` (and `OLLAMA_MODEL` if you pulled a different tag) in `.env` and restart `npm run dev`. Calls go to Ollama's `/api/chat` with the Zod schema converted to a JSON schema in `format`, and the reply is validated against the same Zod schema; any failure falls back to the rules engine. Local generation is slower than hosted APIs, so raise `BC_LLM_TIMEOUT_MS` (e.g. 180000) and `BC_TASK_TIMEOUT_MS` (e.g. 300000). Rough sizing: 8 GB VRAM → `qwen3:8b`; 16 GB+ VRAM or 32 GB RAM with patience → `qwen3:14b`.
 
 ## Using PostgreSQL / Supabase
 

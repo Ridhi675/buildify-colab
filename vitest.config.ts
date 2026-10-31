@@ -8,7 +8,7 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     fileParallelism: false,
     testTimeout: 30000,
-    env: { DATABASE_URL: "file:./test.db", AUTH_SECRET: "test-secret", BC_AGENT_STEP_MS: "0", ANTHROPIC_API_KEY: "" },
+    env: { DATABASE_URL: "file:./test.db", AUTH_SECRET: "test-secret", BC_AGENT_STEP_MS: "0", ANTHROPIC_API_KEY: "", LLM_PROVIDER: "" },
     globalSetup: ["tests/global-setup.ts"],
   },
 });

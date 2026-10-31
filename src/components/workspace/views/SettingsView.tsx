@@ -55,7 +55,7 @@ export function SettingsView() {
           <p className="text-xs text-slate-600">
             {ai.enabled
               ? "Agents call the configured model with schema-validated structured output, bounded retries and timeouts. If a call fails, the deterministic rules engine is used and the output is labelled “Rules engine”."
-              : "Set ANTHROPIC_API_KEY in .env to enable LLM-generated interpretations, copy and inferred impact notes. Until then every agent output is produced by the deterministic rules engine and labelled as such — nothing is presented as AI-generated when it isn't."}
+              : "Set ANTHROPIC_API_KEY, or LLM_PROVIDER=ollama for local models, in .env to enable LLM-generated interpretations, copy and inferred impact notes. Until then every agent output is produced by the deterministic rules engine and labelled as such — nothing is presented as AI-generated when it isn't."}
           </p>
           <p className="text-xs text-slate-500">Agent phases are paced at {state.metrics.stepDelayMs}ms (BC_AGENT_STEP_MS) so humans can see and interrupt work during a live demo.</p>
         </div>

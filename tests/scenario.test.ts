@@ -61,8 +61,12 @@ describe("CareConnect demo scenario", () => {
     // Approval with the second human starts Reviewer + Builder in parallel.
     process.env.BC_AGENT_STEP_MS = "40";
     expect((await wf.vote(P, { ...daniel, role: "designer" }, ar.id, "approve")).status).toBe("approved");
-    await new Promise((r) => setTimeout(r, 60));
-    const running = await db.agentTask.findMany({ where: { projectId: P, status: "running" }, include: { agent: true } });
+    // Poll until both agents are running at once (task claims take a few DB writes; slow disks need more than a fixed sleep).
+    let running: { agent: { key: string } }[] = [];
+    for (const end = Date.now() + 3000; Date.now() < end; await new Promise((r) => setTimeout(r, 10))) {
+      running = await db.agentTask.findMany({ where: { projectId: P, status: "running" }, include: { agent: true } });
+      if (running.length >= 2) break;
+    }
     expect(new Set(running.map((t) => t.agent.key))).toEqual(new Set(["reviewer", "builder"]));
     expect(await db.artifactVersion.count({ where: { projectId: P } })).toBe(1);
   });

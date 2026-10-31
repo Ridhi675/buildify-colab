@@ -9,6 +9,16 @@ Preview-first multiplayer AI workspace: 2 humans + Reviewer AI + Builder AI on o
 - `npm run lint` — `tsc --noEmit`; `npm run build` — production build
 - Never use `prisma db push --force-reset` (Prisma blocks it for AI agents). The test setup deletes `prisma/test.db` instead.
 
+- `npm run llm:check` — one real Reviewer call through the configured LLM; exits 0 only if the LLM (not the rules engine) answered
+- Project skills: `/check` (typecheck + tests + graphify), `/start-ollama-dev` (Ollama → model → llm:check → dev server)
+
+## Local AI (Ollama)
+- This machine runs agents on Ollama: `.env` has `LLM_PROVIDER="ollama"`, `OLLAMA_MODEL="qwen3:8b"`, `OLLAMA_THINK="false"`, longer `BC_LLM_TIMEOUT_MS` / `BC_TASK_TIMEOUT_MS`
+- Hardware: RTX 4060 Laptop 8 GB VRAM, 32 GB RAM → 8B models run fully on GPU; bigger ones spill to CPU
+- Ollama must be running on `localhost:11434` before testing the AI path; on Windows `ollama.exe` may not be on the Bash PATH
+- Tests always use the rules engine (`vitest.config.ts` pins `LLM_PROVIDER=""`); `tests/llm.test.ts` stubs `fetch` for the Ollama adapter
+- SQLite writes are slow here: in tests, poll for a condition instead of sleeping a fixed time
+
 ## Layout
 - `src/lib/engine/` — pure, deterministic logic (no DB): `spec.ts` (requirements → AppSpec, rebuild, diff), `context.ts` (fingerprints, stale check), `impact.ts` (Ripple Effect)
 - `src/lib/ai/` — `llm.ts` (Anthropic adapter, structured output, retries/timeouts), `agents.ts` (Reviewer/Builder capabilities, each with rules-engine fallback labelled `source: "rules"`)
