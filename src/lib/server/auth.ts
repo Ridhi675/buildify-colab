@@ -1,10 +1,16 @@
-// Demo identity: signed per-tab session tokens (userId.hmac). Two browser tabs
-// can hold two different identities, which is how two humans join one workspace.
+// Session tokens (userId.hmac) for real accounts and the seeded demo people.
+// Tokens live in the browser, so each computer (or tab) holds its own identity.
 
 import crypto from "node:crypto";
 import { db } from "../db";
 
-const secret = () => process.env.AUTH_SECRET || "dev-only-secret-change-me";
+const secret = () => {
+  const s = process.env.AUTH_SECRET;
+  if (s) return s;
+  // Anyone who knows the fallback could forge a session, so production must set its own.
+  if (process.env.NODE_ENV === "production") throw new HttpError(500, "AUTH_SECRET is not set on the server");
+  return "dev-only-secret-change-me";
+};
 
 export function signToken(userId: string) {
   const mac = crypto.createHmac("sha256", secret()).update(userId).digest("base64url").slice(0, 32);

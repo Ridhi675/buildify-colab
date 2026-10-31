@@ -2,6 +2,7 @@
 
 import { Cpu, Rocket, ShieldCheck, Users } from "lucide-react";
 import { useState } from "react";
+import { agentColor } from "../../effects";
 import { Avatar, Badge, Button, Card, CardHeader, Field, inputCls } from "../../ui";
 import { ApprovalCard, useWs } from "../shared";
 
@@ -24,7 +25,7 @@ export function SettingsView() {
           ))}
           {state.agents.map((a) => (
             <div key={a.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: a.key === "reviewer" ? "#7c3aed" : "#0891b2" }}>AI</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: agentColor(a.key) }}>AI</span>
               <div><div className="font-medium">{a.name}</div><div className="text-xs text-slate-500">{a.role} · can recommend, never approve</div></div>
             </div>
           ))}

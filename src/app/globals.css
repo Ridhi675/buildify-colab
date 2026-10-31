@@ -1,26 +1,402 @@
 @import "tailwindcss";
 
+/* Dark mode is class-based so next-themes controls it (no flash, saved choice). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens — the single source of truth for the app's look.
+   Components use the semantic names below (bg-surface, text-muted-foreground,
+   border-border, shadow-md, rounded-2xl …), never raw hex values.
+   --------------------------------------------------------------------------- */
+:root {
+  --background: #f5f3ea;
+  --foreground: #2e3228;
+  --surface: #ffffff;
+  --surface-muted: #efece2;
+  --surface-glass: rgb(255 255 255 / 0.7);
+  --border: #e3dfd1;
+  --border-strong: #d2ccb9;
+  --muted: #eeebe0;
+  --muted-foreground: #666a5a;
+  --primary: #2e3228;
+  --primary-foreground: #ffffff;
+  --accent: #4f5d44;
+  --accent-foreground: #ffffff;
+  --accent-soft: #e6eadd;
+  --lime: #c8ad83;
+  --lime-foreground: #2e3228;
+  --ring: #4f5d44;
+  --overlay: rgb(46 50 40 / 0.35);
+  --grid-line: rgb(46 50 40 / 0.06);
+  --agent-reviewer: #4f5d44;
+  --agent-builder: #c8ad83;
+  --terminal-bg: #23271f;
+  --terminal-fg: #ebe8dc;
+  --terminal-muted: #9a9c8a;
+  --terminal-accent: #d9bf94;
+  --aurora-1: #e7dcc5;
+  --aurora-2: #dde3d2;
+  --aurora-3: #efe5d0;
+  --glow-1: #e2d3b6;
+  --glow-2: #d2dbc4;
+
+  --n-50: #f7f5ee;
+  --n-100: #efece2;
+  --n-200: #e3dfd1;
+  --n-300: #d0cab6;
+  --n-400: #9d9a88;
+  --n-500: #6b6d5d;
+  --n-600: #55584a;
+  --n-700: #414437;
+  --n-800: #2e3127;
+  --n-900: #1f2219;
+  --n-950: #15170f;
+
+  --gradient-page: linear-gradient(180deg, #f5f3ea 0%, #f1eee3 55%, #f5f3ea 100%);
+
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.04), 0 2px 8px rgb(16 24 40 / 0.04);
+  --shadow-md: 0 2px 6px rgb(16 24 40 / 0.04), 0 12px 32px -8px rgb(16 24 40 / 0.09);
+  --shadow-lg: 0 8px 24px rgb(16 24 40 / 0.06), 0 32px 64px -16px rgb(16 24 40 / 0.18);
+}
+
+.dark {
+  --background: #171a14;
+  --foreground: #eeece3;
+  --surface: #1f231b;
+  --surface-muted: #252a20;
+  --surface-glass: rgb(31 35 27 / 0.62);
+  --border: #2e3428;
+  --border-strong: #3b4234;
+  --muted: #242920;
+  --muted-foreground: #a5a896;
+  --primary: #eeece3;
+  --primary-foreground: #171a14;
+  --accent: #a9b98f;
+  --accent-foreground: #171a14;
+  --accent-soft: #2a3123;
+  --lime: #c8ad83;
+  --lime-foreground: #171a14;
+  --ring: #a9b98f;
+  --overlay: rgb(0 0 0 / 0.55);
+  --grid-line: rgb(238 236 227 / 0.05);
+  --agent-reviewer: #7d8f68;
+  --agent-builder: #c8ad83;
+  --terminal-bg: #10120e;
+  --terminal-fg: #e6e3d6;
+  --terminal-muted: #8c8f7e;
+  --terminal-accent: #d9bf94;
+  --aurora-1: #2b3322;
+  --aurora-2: #3a3324;
+  --aurora-3: #262d1f;
+  --glow-1: #3e4a31;
+  --glow-2: #58492e;
+
+  --n-50: #1b1f17;
+  --n-100: #20251b;
+  --n-200: #2c3226;
+  --n-300: #3a4133;
+  --n-400: #767b68;
+  --n-500: #9a9e8a;
+  --n-600: #b3b6a4;
+  --n-700: #cccebe;
+  --n-800: #e0e1d6;
+  --n-900: #efeee6;
+  --n-950: #f8f7f2;
+
+  --gradient-page: radial-gradient(120% 80% at 15% 0%, #222819 0%, #1a1d16 45%, #171a14 100%);
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.2);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.3), 0 12px 32px -8px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.35), 0 32px 64px -16px rgb(0 0 0 / 0.6);
+}
+
+/* Expose tokens to Tailwind: bg-background, text-foreground, bg-surface, … */
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-glass: var(--surface-glass);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-lime: var(--lime);
+  --color-lime-foreground: var(--lime-foreground);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-lg);
+  --shadow-2xl: var(--shadow-lg);
+
+  /* Legacy bridge: views not yet rewritten still use slate-*, indigo-* and the
+     status colours. These map onto the tokens so they follow light/dark:
+     tints mix toward the surface, text shades mix toward the foreground. */
+  --color-slate-50: var(--n-50);
+  --color-slate-100: var(--n-100);
+  --color-slate-200: var(--n-200);
+  --color-slate-300: var(--n-300);
+  --color-slate-400: var(--n-400);
+  --color-slate-500: var(--n-500);
+  --color-slate-600: var(--n-600);
+  --color-slate-700: var(--n-700);
+  --color-slate-800: var(--n-800);
+  --color-slate-900: var(--n-900);
+  --color-slate-950: var(--n-950);
+  --color-rose-50: color-mix(in oklab, #e11d48 9%, var(--surface));
+  --color-rose-100: color-mix(in oklab, #e11d48 15%, var(--surface));
+  --color-rose-200: color-mix(in oklab, #e11d48 28%, var(--surface));
+  --color-rose-300: color-mix(in oklab, #e11d48 42%, var(--surface));
+  --color-rose-400: color-mix(in oklab, #e11d48 70%, var(--surface));
+  --color-rose-500: #e11d48;
+  --color-rose-600: #e11d48;
+  --color-rose-700: color-mix(in oklab, #e11d48 78%, var(--foreground));
+  --color-rose-800: color-mix(in oklab, #e11d48 62%, var(--foreground));
+  --color-rose-900: color-mix(in oklab, #e11d48 48%, var(--foreground));
+  --color-amber-50: color-mix(in oklab, #d97706 9%, var(--surface));
+  --color-amber-100: color-mix(in oklab, #d97706 15%, var(--surface));
+  --color-amber-200: color-mix(in oklab, #d97706 28%, var(--surface));
+  --color-amber-300: color-mix(in oklab, #d97706 42%, var(--surface));
+  --color-amber-400: color-mix(in oklab, #d97706 70%, var(--surface));
+  --color-amber-500: #d97706;
+  --color-amber-600: #d97706;
+  --color-amber-700: color-mix(in oklab, #d97706 78%, var(--foreground));
+  --color-amber-800: color-mix(in oklab, #d97706 62%, var(--foreground));
+  --color-amber-900: color-mix(in oklab, #d97706 48%, var(--foreground));
+  --color-emerald-50: color-mix(in oklab, #059669 9%, var(--surface));
+  --color-emerald-100: color-mix(in oklab, #059669 15%, var(--surface));
+  --color-emerald-200: color-mix(in oklab, #059669 28%, var(--surface));
+  --color-emerald-300: color-mix(in oklab, #059669 42%, var(--surface));
+  --color-emerald-400: color-mix(in oklab, #059669 70%, var(--surface));
+  --color-emerald-500: #059669;
+  --color-emerald-600: #059669;
+  --color-emerald-700: color-mix(in oklab, #059669 78%, var(--foreground));
+  --color-emerald-800: color-mix(in oklab, #059669 62%, var(--foreground));
+  --color-emerald-900: color-mix(in oklab, #059669 48%, var(--foreground));
+  --color-violet-50: color-mix(in oklab, #7c3aed 9%, var(--surface));
+  --color-violet-100: color-mix(in oklab, #7c3aed 15%, var(--surface));
+  --color-violet-200: color-mix(in oklab, #7c3aed 28%, var(--surface));
+  --color-violet-300: color-mix(in oklab, #7c3aed 42%, var(--surface));
+  --color-violet-400: color-mix(in oklab, #7c3aed 70%, var(--surface));
+  --color-violet-500: #7c3aed;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: color-mix(in oklab, #7c3aed 78%, var(--foreground));
+  --color-violet-800: color-mix(in oklab, #7c3aed 62%, var(--foreground));
+  --color-violet-900: color-mix(in oklab, #7c3aed 48%, var(--foreground));
+  --color-sky-50: color-mix(in oklab, #0284c7 9%, var(--surface));
+  --color-sky-100: color-mix(in oklab, #0284c7 15%, var(--surface));
+  --color-sky-200: color-mix(in oklab, #0284c7 28%, var(--surface));
+  --color-sky-300: color-mix(in oklab, #0284c7 42%, var(--surface));
+  --color-sky-400: color-mix(in oklab, #0284c7 70%, var(--surface));
+  --color-sky-500: #0284c7;
+  --color-sky-600: #0284c7;
+  --color-sky-700: color-mix(in oklab, #0284c7 78%, var(--foreground));
+  --color-sky-800: color-mix(in oklab, #0284c7 62%, var(--foreground));
+  --color-sky-900: color-mix(in oklab, #0284c7 48%, var(--foreground));
+  --color-indigo-50: color-mix(in oklab, var(--accent) 9%, var(--surface));
+  --color-indigo-100: color-mix(in oklab, var(--accent) 15%, var(--surface));
+  --color-indigo-200: color-mix(in oklab, var(--accent) 28%, var(--surface));
+  --color-indigo-300: color-mix(in oklab, var(--accent) 42%, var(--surface));
+  --color-indigo-400: color-mix(in oklab, var(--accent) 70%, var(--surface));
+  --color-indigo-500: var(--accent);
+  --color-indigo-600: var(--accent);
+  --color-indigo-700: color-mix(in oklab, var(--accent) 78%, var(--foreground));
+  --color-indigo-800: color-mix(in oklab, var(--accent) 62%, var(--foreground));
+  --color-indigo-900: color-mix(in oklab, var(--accent) 48%, var(--foreground));
+}
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --color-ink: #0f172a;
-  --color-muted: #64748b;
-  --color-line: #e2e8f0;
-  --color-surface: #ffffff;
-  --color-canvas: #f6f7f9;
-  --color-brand: #4f46e5;
-  --color-brand-soft: #eef2ff;
+  /* Radius scale: soft and generous; pills use rounded-full. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.75rem;
+}
+
+@utility bg-page {
+  background: var(--gradient-page);
 }
 
 html,
 body {
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background: var(--background);
+  color: var(--foreground);
 }
 
 body {
-  font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
 }
+
+/* ---------------------------------------------------------------------------
+   Effects — built from the tokens above, transform/opacity only (cheap to
+   animate). Everything stops under prefers-reduced-motion (see bottom).
+   --------------------------------------------------------------------------- */
+
+/* Faint grid that fades out from the top centre. The parent clips it; the
+   drift is a transform so it never repaints. */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 75% 60% at 50% 0%, #000 35%, transparent 100%);
+}
+.bg-grid-drift {
+  position: absolute;
+  inset: -56px 0 0 -56px;
+  animation: grid-drift 14s linear infinite;
+  will-change: transform;
+}
+@keyframes grid-drift {
+  to { transform: translate3d(56px, 56px, 0); }
+}
+
+/* Slow drifting colour blobs: soft radial gradients (no blur filter), moved by transform. */
+.aurora { position: absolute; border-radius: 9999px; opacity: 0.85; will-change: transform; }
+.aurora-1 { background: radial-gradient(closest-side, var(--aurora-1), transparent); animation: drift-a 22s ease-in-out infinite alternate; }
+.aurora-2 { background: radial-gradient(closest-side, var(--aurora-2), transparent); animation: drift-b 26s ease-in-out infinite alternate; }
+.glow-1 { background: radial-gradient(closest-side, var(--glow-1), transparent); animation: drift-a 22s ease-in-out infinite alternate; }
+.glow-2 { background: radial-gradient(closest-side, var(--glow-2), transparent); animation: drift-b 26s ease-in-out infinite alternate; }
+.aurora-3 { background: radial-gradient(closest-side, var(--aurora-3), transparent); animation: drift-a 30s ease-in-out infinite alternate-reverse; }
+@keyframes drift-a { to { transform: translate3d(12%, 8%, 0) scale(1.15); } }
+@keyframes drift-b { to { transform: translate3d(-14%, 6%, 0) scale(0.9); } }
+
+/* Cursor-reactive backdrop. --mx/--my/--px/--py come from CursorBackground. */
+.cursor-parallax { transform: translate3d(calc(var(--px, 0) * var(--depth)), calc(var(--py, 0) * var(--depth)), 0); }
+/* A dim, light square that follows the pointer. No glow; transform only. */
+.cursor-square {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--accent) 7%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, transparent);
+  transform: translate3d(calc(var(--mx, -200px) - 32px), calc(var(--my, -200px) - 32px), 0);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.cursor-bg[data-active] .cursor-square { opacity: 1; }
+
+/* Pipeline: each step lights up in turn; a pulse travels along each connector.
+   Only opacity and transform animate, so nothing repaints per frame. */
+.pipe-node { position: relative; }
+.pipe-node::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 18%, transparent), 0 0 28px color-mix(in oklab, var(--accent) 45%, transparent);
+  opacity: 0;
+  animation: pipe-node 5.6s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+@keyframes pipe-node {
+  0%, 18%, 100% { opacity: 0; }
+  6%, 12% { opacity: 1; }
+}
+.pipe-pulse { animation: pipe-pulse 5.6s linear infinite; }
+@keyframes pipe-pulse {
+  0% { transform: translateX(-100%); opacity: 0; }
+  2% { opacity: 1; }
+  13% { transform: translateX(0); opacity: 1; }
+  15%, 100% { transform: translateX(0); opacity: 0; }
+}
+
+/* Gradient headline text. */
+.text-gradient {
+  background: linear-gradient(180deg, var(--foreground) 15%, color-mix(in oklab, var(--foreground) 55%, var(--background)) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.text-gradient-dim {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--foreground) 62%, var(--background)) 0%, color-mix(in oklab, var(--foreground) 38%, var(--background)) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft accent halo behind primary buttons on hover. */
+.glow-btn { position: relative; isolation: isolate; }
+.glow-btn::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(70% 140% at 50% 100%, color-mix(in oklab, var(--accent) 60%, transparent), transparent 70%);
+  filter: blur(10px);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.glow-btn:hover:not(:disabled)::after,
+.glow-btn:focus-visible::after { opacity: 0.75; }
+
+/* Card glow: a border highlight and inner spotlight that follow the pointer.
+   --gx/--gy are set by useGlow(); without JS the glow sits at the top. */
+.glow-card { position: relative; isolation: isolate; }
+.glow-card::before,
+.glow-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.glow-card::before {
+  padding: 1px;
+  background: radial-gradient(280px circle at var(--gx, 50%) var(--gy, 0%), color-mix(in oklab, var(--accent) 75%, transparent), transparent 65%);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.glow-card::after {
+  z-index: -1;
+  background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 0%), color-mix(in oklab, var(--accent) 8%, transparent), transparent 60%);
+}
+.glow-card:hover::before,
+.glow-card:hover::after,
+.glow-card:focus-within::before { opacity: 1; }
+.glow-card[data-glow="on"]::before { opacity: 0.6; }
+
+/* Orbiting actors around the logo mark. */
+.orbit { animation: spin 18s linear infinite; }
+.orbit-counter { animation: spin 18s linear infinite reverse; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.halo { animation: halo 3.2s ease-out infinite; }
+@keyframes halo {
+  0% { transform: scale(0.85); opacity: 0.55; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Hero entrance without JS, so the largest paint is never delayed. */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+.caret::after { content: "▍"; margin-left: 2px; color: var(--accent); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
 
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
@@ -35,8 +411,20 @@ body {
 .animate-in { animation: slide-in 0.18s ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-pulse-soft, .animate-in { animation: none; }
+  .animate-pulse-soft, .animate-in, .bg-grid-drift, .pipe-node::after, .pipe-pulse, .aurora, .glow-1, .glow-2, .orbit, .orbit-counter, .halo, .fade-up, .caret::after { animation: none; }
+  .halo { display: none; }
 }
 
+/* React Flow controls follow the theme. */
+.react-flow__controls-button { background: var(--surface); border-color: var(--border); color: var(--foreground); fill: var(--foreground); }
+.react-flow__controls-button:hover { background: var(--muted); }
+.react-flow__controls { box-shadow: var(--shadow-sm); border-radius: 0.75rem; overflow: hidden; }
+
+/* Lenis smooth scrolling (landing page only). */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: hidden; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+
 .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; }

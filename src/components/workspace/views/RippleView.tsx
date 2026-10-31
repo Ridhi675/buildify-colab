@@ -24,7 +24,7 @@ export function RippleView() {
         <CardHeader icon={<Waves size={16} />} title="Ripple Effect — impact analysis" subtitle="When a requirement changes, see everything it touches before anything is committed. Deterministic dependency checks first; AI suggestions are labelled “inferred”." />
         <div className="flex flex-wrap gap-2 p-3">
           {state.impacts.map((i) => (
-            <button key={i.id} onClick={() => setSel(i.id)} className={cn("flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs", impact?.id === i.id ? "border-indigo-400 bg-indigo-50" : "border-slate-200 bg-white")}>
+            <button key={i.id} onClick={() => setSel(i.id)} className={cn("flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs", impact?.id === i.id ? "border-indigo-400 bg-indigo-50" : "border-slate-200 bg-surface")}>
               <span className="font-mono">{i.requirementKey}</span> {i.proposedTitle.slice(0, 32)} <StatusBadge status={i.status} />
             </button>
           ))}
@@ -137,7 +137,7 @@ function ImpactPanel({ impact }: { impact: Impact }) {
             </div>
 
             <div className="rounded-xl border border-dashed border-violet-300 bg-violet-50/40 p-3">
-              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-violet-700"><Bot size={13} /> Inferred by Reviewer AI (not from dependency data)</div>
+              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-violet-700"><Bot size={13} /> Inferred by Bunty (not from dependency data)</div>
               {r.inferred?.length ? <ul className="space-y-0.5 text-xs text-slate-700">{r.inferred.map((x, i) => <li key={i}><Badge tone="violet">inferred</Badge> <b>{x.area}:</b> {x.note}</li>)}</ul> : <div className="text-xs text-slate-500">Reviewer is still looking, or found nothing to add.</div>}
             </div>
 

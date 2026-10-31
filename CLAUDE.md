@@ -12,8 +12,8 @@ Preview-first multiplayer AI workspace: 2 humans + Reviewer AI + Builder AI on o
 ## Layout
 - `src/lib/engine/` — pure, deterministic logic (no DB): `spec.ts` (requirements → AppSpec, rebuild, diff), `context.ts` (fingerprints, stale check), `impact.ts` (Ripple Effect)
 - `src/lib/ai/` — `llm.ts` (Anthropic adapter, structured output, retries/timeouts), `agents.ts` (Reviewer/Builder capabilities, each with rules-engine fallback labelled `source: "rules"`)
-- `src/lib/server/` — `tasks.ts` (async runner, safe boundaries, epochs, controls, restart/recovery), `workflow.ts` (requirements, approvals, ripple, restore, compare), `core.ts` (activity, notifications, context commits), `actions.ts` (zod-validated action dispatcher), `realtime.ts` (SSE hub, presence, soft locks), `state.ts` (client snapshot), `seed.ts`
-- `src/app/api/` — `session`, `projects`, `projects/[id]/{state,action,stream}`
+- `src/lib/server/` — `tasks.ts` (async runner, safe boundaries, epochs, controls, restart/recovery), `workflow.ts` (requirements, approvals, ripple, restore, compare), `core.ts` (activity, notifications, context commits), `actions.ts` (zod-validated action dispatcher), `realtime.ts` (SSE hub, presence, soft locks), `state.ts` (client snapshot), `accounts.ts` (email/password accounts, invite links), `seed.ts`
+- `src/app/api/` — `session` (sign up / sign in / demo pick), `invites/[token]` (preview + join), `projects`, `projects/[id]/{state,action,stream}`
 - `src/components/` — `client.ts` (per-tab identity, `useProject` SSE hook), `AppRenderer.tsx` (safe JSON renderer), `workspace/` (shell + one file per view)
 
 ## Conventions

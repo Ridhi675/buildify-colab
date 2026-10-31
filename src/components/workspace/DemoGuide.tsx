@@ -31,8 +31,8 @@ export function DemoGuide({ onClose }: { onClose: () => void }) {
 
   const steps: Step[] = [
     { n: 1, title: "Both humans join the workspace", who: "Aisha + Daniel", official: "1", how: "Open a second browser tab, choose the other person. Avatars turn green.", view: "workspace", done: online("u_aisha") && online("u_daniel") },
-    { n: 2, title: "Aisha requests an appointment-booking app", who: "Aisha", official: "1", how: "Workspace → “Use demo request” → Simplify with Reviewer AI.", view: "workspace", done: has((t) => t.type === "simplify") },
-    { n: 3, title: "Reviewer simplifies into requirements", who: "Reviewer AI → humans", how: "Review the interpretation beside the original request; edit or reject any line, then Approve all.", view: "workspace", done: state.requirements.some((r) => r.status === "approved") },
+    { n: 2, title: "Aisha requests an appointment-booking app", who: "Aisha", official: "1", how: "Workspace → “Use demo request” → Simplify with Bunty.", view: "workspace", done: has((t) => t.type === "simplify") },
+    { n: 3, title: "Bunty simplifies into requirements", who: "Bunty → humans", how: "Review the interpretation beside the original request; edit or reject any line, then Approve all.", view: "workspace", done: state.requirements.some((r) => r.status === "approved") },
     { n: 4, title: "Preview Studio generates visual + textual spec", who: "Any human", how: "Preview Studio → Generate preview.", view: "preview", done: state.previews.length > 0 },
     { n: 5, title: "Both humans approve the preview", who: "Aisha + Daniel", official: "1", how: "Each human clicks Approve. Two approvals are required — the Builder is blocked until then.", view: "preview", done: state.previews.some((p) => p.status === "approved") },
     { n: 6, title: "Reviewer and Builder work in parallel", who: "Agents", official: "2", how: "Reviewer writes acceptance tests while Builder builds. Watch both in the Agent Control Centre.", view: "agents", done: has((t) => t.type === "acceptance") && has((t) => t.type === "build") },
@@ -52,7 +52,7 @@ export function DemoGuide({ onClose }: { onClose: () => void }) {
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
-    <div className="fixed bottom-4 left-4 z-40 w-[360px] max-w-[calc(100vw-32px)] rounded-2xl border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed bottom-4 left-4 z-40 w-[360px] max-w-[calc(100vw-32px)] rounded-2xl border border-slate-200 bg-surface shadow-2xl">
       <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
         <div className="flex-1">
           <div className="text-sm font-semibold">Demo guide · CareConnect</div>

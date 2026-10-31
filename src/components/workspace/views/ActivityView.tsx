@@ -19,7 +19,7 @@ export function ActivityView() {
             const member = state.members.find((m) => m.userId === a.actorId);
             return (
               <li key={a.id} className="flex items-start gap-3 px-4 py-2.5">
-                <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white")} style={{ background: member?.color ?? (a.actorKind === "agent" ? "#7c3aed" : "#94a3b8") }}>
+                <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white")} style={{ background: member?.color ?? (a.actorKind === "agent" ? "var(--agent-reviewer)" : "#94a3b8") }}>
                   {a.actorKind === "agent" ? <Bot size={14} /> : <User size={14} />}
                 </span>
                 <div className="min-w-0 flex-1 text-sm">
