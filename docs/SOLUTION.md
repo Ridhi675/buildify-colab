@@ -1,0 +1,19 @@
+# Buildify CoLab — solution overview
+
+Most multi-agent tools hide agents behind one chat box, which breaks down when a second person joins or a decision changes midway. Buildify CoLab treats collaboration as the product. Two identifiable humans — a founder and a designer — work in the same live workspace with two AI agents that have distinct jobs: a **Reviewer AI** that interprets, validates and explains, and a **Builder AI** that produces the artifact. Everyone works toward one visible prototype.
+
+**Preview first.** A plain-language request is turned by the Reviewer into structured requirements, each with an ID, priority, version, acceptance criteria and linked components, shown next to the original words so human intent is never lost. Humans edit, reject or approve them. The Reviewer then produces a cheap visual and textual preview rendered from structured JSON. The Builder cannot start full generation until the required humans approve that preview.
+
+**One source of truth.** The Reviewer coordinates, but it is not the memory. Every approved state is committed as an immutable context version. Both agents load context from that store, and every task records the context version and the exact requirement versions it depends on. That fingerprint is what makes change safe.
+
+**Changes ripple visibly.** When Daniel changes the audience to elderly patients while the Builder is mid-build, the Ripple Effect panel shows what that touches before anything is committed. It walks the requirement dependency graph, follows requirement-to-component links and component dependencies, then simulates the rebuild and diffs it. The result lists affected and unaffected components by frontend, design, backend and testing, the agents involved, tasks that will become stale, an effort estimate and a step-by-step plan. Anything the Reviewer adds on top is clearly labelled *inferred*. Two humans approve the change.
+
+**Stale work never lands.** When the Builder returns, its fingerprint no longer matches, so the output is quarantined with a plain-language reason instead of overwriting the product. The Reviewer prepares an updated task, but only a human can start it. Edits made against an old version are preserved as conflicts that can be rebased or discarded, never silently applied.
+
+**Agents can crash and recover.** Restarting an agent bumps its epoch, so any late output from the old run is rejected at the database level. The agent then rebuilds its working context only from persisted state: current context version, approved requirements, recent decisions, quarantined work and pending approvals. It resumes from the last safe step, or restarts on fresh context if its task went stale. Hidden model reasoning is not claimed to be restored.
+
+**Humans stay in control.** Every agent task can be paused at a safe boundary, resumed, stopped (late output is discarded), redirected, retried within limits, delegated, or inspected, showing its inputs, context version, dependency versions, run log and output. Approval policies are configurable; the Reviewer can recommend but never vote.
+
+**Every decision is understood.** The Decision Time Machine lists each approved decision with who proposed it, who approved it and why. Each artifact version keeps its own saved spec and requirements, so viewing v1 really shows v1. Comparing versions explains visual, requirement and decision differences in plain language. Restoring a checkpoint creates a new version derived from the snapshot, and all later history stays intact.
+
+**Built to be trusted.** Impact analysis, stale detection and validation are deterministic. The LLM adapter uses schema-validated structured output with retries, timeouts and a rules-engine fallback, and every output is labelled with its source. Artifacts are JSON rendered by a whitelist renderer, so no generated code runs. Twenty automated tests cover the full demo scenario.

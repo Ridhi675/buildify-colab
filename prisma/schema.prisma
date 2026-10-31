@@ -1,0 +1,418 @@
+// Buildify CoLab data model.
+// Local dev uses SQLite (no Docker/Postgres needed). To use PostgreSQL/Supabase,
+// change `provider` to "postgresql" and point DATABASE_URL at it — the models are
+// portable because JSON is stored as text and statuses are plain strings.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String          @id
+  name      String
+  title     String
+  color     String
+  kind      String          @default("human") // human | agent
+  createdAt DateTime        @default(now())
+  members   ProjectMember[]
+  votes     ApprovalVote[]
+}
+
+model Project {
+  id                    String   @id @default(cuid())
+  name                  String
+  description           String
+  ownerId               String
+  isDemo                Boolean  @default(false)
+  contextVersion        Int      @default(0) // latest committed ContextVersion.number
+  currentArtifactVerId  String?
+  phase                 String   @default("requirements") // requirements | preview | build | review | released
+  approvalPolicy        String   @default("{\"major\":2,\"minor\":1,\"release\":2}")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  members         ProjectMember[]
+  requirements    Requirement[]
+  contextVersions ContextVersion[]
+  decisions       Decision[]
+  agents          Agent[]
+  tasks           AgentTask[]
+  impacts         ImpactAnalysis[]
+  components      Component[]
+  previews        Preview[]
+  artifacts       Artifact[]
+  checkpoints     Checkpoint[]
+  approvals       ApprovalRequest[]
+  comments        Comment[]
+  notifications   Notification[]
+  activity        ActivityEvent[]
+  chat            ChatMessage[]
+  snapshots       WorkspaceSnapshot[]
+}
+
+model ProjectMember {
+  id        String  @id @default(cuid())
+  projectId String
+  userId    String
+  role      String // founder | designer | observer
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model Requirement {
+  id                 String   @id @default(cuid())
+  projectId          String
+  key                String // REQ-001
+  title              String
+  description        String
+  category           String // audience | layout | theme | accessibility | feature | performance | data
+  priority           String   @default("medium") // must | high | medium | low
+  status             String   @default("proposed") // proposed | approved | rejected | superseded
+  version            Int      @default(1)
+  acceptanceCriteria String   @default("[]") // JSON string[]
+  components         String   @default("[]") // JSON component keys this requirement drives
+  originalRequest    String?
+  authorId           String
+  source             String   @default("human") // human | reviewer
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisions          RequirementRevision[]
+
+  @@unique([projectId, key])
+  @@index([projectId, status])
+}
+
+model RequirementRevision {
+  id             String      @id @default(cuid())
+  requirementId  String
+  version        Int
+  title          String
+  description    String
+  priority       String
+  status         String
+  acceptance     String
+  authorId       String
+  reason         String?
+  contextVersion Int
+  createdAt      DateTime    @default(now())
+  requirement    Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@unique([requirementId, version])
+}
+
+model RequirementDependency {
+  id        String  @id @default(cuid())
+  projectId String
+  fromKey   String // requirement key that depends …
+  toKey     String // … on this requirement key
+  kind      String  @default("depends_on")
+  inferred  Boolean @default(false)
+
+  @@index([projectId])
+}
+
+model Component {
+  id          String  @id @default(cuid())
+  projectId   String
+  key         String // nav, booking-form …
+  name        String
+  category    String // frontend | backend | design | testing
+  description String  @default("")
+  version     Int     @default(1)
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key])
+}
+
+model ComponentDependency {
+  id        String  @id @default(cuid())
+  projectId String
+  fromKey   String // component key …
+  toKey     String // … depends on this component key
+  kind      String  @default("depends_on")
+  inferred  Boolean @default(false)
+
+  @@index([projectId])
+}
+
+model ContextVersion {
+  id         String   @id @default(cuid())
+  projectId  String
+  number     Int
+  snapshot   String // JSON: { requirements: [{key,version,title,description,status,...}] }
+  reason     String
+  authorId   String
+  decisionId String?
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, number])
+}
+
+model Decision {
+  id                   String   @id @default(cuid())
+  projectId            String
+  title                String
+  summary              String
+  reason               String
+  kind                 String // requirements | preview | change | build | restore | release
+  proposedById         String
+  approvedByIds        String   @default("[]")
+  status               String   @default("approved")
+  contextVersion       Int
+  affectedRequirements String   @default("[]")
+  affectedComponents   String   @default("[]")
+  agentContributions   String   @default("[]")
+  createdAt            DateTime @default(now())
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Agent {
+  id             String    @id @default(cuid())
+  projectId      String
+  key            String // reviewer | builder
+  name           String
+  role           String
+  status         String    @default("idle") // idle | working | paused | stopped | restarting | offline
+  currentTaskId  String?
+  contextVersion Int       @default(0) // context version last loaded into this agent
+  epoch          Int       @default(1) // increments on restart; stale epochs cannot commit
+  lastActivityAt DateTime  @default(now())
+  lastAction     String?
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks          AgentTask[]
+  runs           AgentRun[]
+
+  @@unique([projectId, key])
+}
+
+model AgentTask {
+  id                 String     @id @default(cuid())
+  projectId          String
+  agentId            String
+  type               String // simplify | acceptance | preview | build_plan | build | validate | impact
+  title              String
+  input              String     @default("{}")
+  status             String     @default("queued") // queued | running | paused | completed | failed | cancelled | quarantined | superseded
+  phase              Int        @default(0) // completed phase index (resume boundary)
+  phaseLabel         String     @default("Queued")
+  control            String? // pause | stop (cooperative signal)
+  baseContextVersion Int
+  requirementKeys    String     @default("[]")
+  depFingerprint     String     @default("")
+  output             String?
+  validation         String?
+  staleReason        String?
+  attempts           Int        @default(0)
+  maxAttempts        Int        @default(3)
+  error              String?
+  epoch              Int        @default(1)
+  parentTaskId       String?
+  createdById        String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  project            Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agent              Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  runs               AgentRun[]
+
+  @@index([projectId, status])
+}
+
+model AgentRun {
+  id             String    @id @default(cuid())
+  taskId         String
+  agentId        String
+  attempt        Int
+  status         String // running | completed | failed | cancelled | interrupted
+  contextVersion Int
+  source         String    @default("rules") // llm | rules
+  model          String?
+  tokensIn       Int       @default(0)
+  tokensOut      Int       @default(0)
+  costUsd        Float     @default(0)
+  log            String    @default("[]")
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  task           AgentTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agent          Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model ImpactAnalysis {
+  id               String   @id @default(cuid())
+  projectId        String
+  requirementKey   String
+  previousText     String
+  proposedText     String
+  proposedTitle    String
+  severity         String // low | medium | high
+  result           String // JSON ImpactResult
+  status           String   @default("pending") // pending | approved | rejected | modified
+  approvalId       String?
+  baseContextVersion Int
+  createdById      String
+  createdAt        DateTime @default(now())
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Preview {
+  id             String   @id @default(cuid())
+  projectId      String
+  number         Int
+  spec           String // JSON AppSpec (visual)
+  textual        String // JSON textual spec
+  status         String   @default("proposed") // proposed | approved | rejected | changes_requested
+  contextVersion Int
+  source         String   @default("rules")
+  feedback       String   @default("[]")
+  createdAt      DateTime @default(now())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Artifact {
+  id        String            @id @default(cuid())
+  projectId String
+  name      String
+  createdAt DateTime          @default(now())
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions  ArtifactVersion[]
+}
+
+model ArtifactVersion {
+  id                   String   @id @default(cuid())
+  artifactId           String
+  projectId            String
+  number               Int
+  label                String
+  spec                 String // JSON AppSpec
+  contextVersion       Int
+  requirementsSnapshot String
+  changedComponents    String   @default("[]")
+  decisionId           String?
+  derivedFromId        String?
+  authorId             String
+  status               String   @default("approved") // approved | pending | quarantined
+  createdAt            DateTime @default(now())
+  artifact             Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, number])
+}
+
+model WorkspaceSnapshot {
+  id        String   @id @default(cuid())
+  projectId String
+  data      String // JSON full workspace export
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Checkpoint {
+  id                   String   @id @default(cuid())
+  projectId            String
+  milestone            String
+  label                String
+  contextVersion       Int
+  requirementsSnapshot String
+  artifactVersionId    String?
+  taskStatuses         String
+  agentMeta            String
+  createdById          String
+  createdAt            DateTime @default(now())
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalRequest {
+  id                String         @id @default(cuid())
+  projectId         String
+  kind              String // preview | change | build_output | release | restore
+  title             String
+  summary           String
+  payload           String         @default("{}")
+  requiredApprovals Int            @default(1)
+  status            String         @default("pending") // pending | approved | rejected | revision_requested | superseded
+  contextVersion    Int
+  recommendation    String? // JSON {verdict, rationale} from Reviewer AI — advisory only
+  createdById       String
+  createdAt         DateTime       @default(now())
+  resolvedAt        DateTime?
+  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  votes             ApprovalVote[]
+
+  @@index([projectId, status])
+}
+
+model ApprovalVote {
+  id        String          @id @default(cuid())
+  requestId String
+  userId    String
+  vote      String // approve | reject | revise
+  comment   String?
+  createdAt DateTime        @default(now())
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, userId])
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  projectId  String
+  authorId   String
+  targetType String // component | requirement | preview | approval | general
+  targetId   String
+  body       String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  projectId String
+  category  String // important | conflict | completed | waiting | context
+  title     String
+  body      String
+  groupKey  String?
+  count     Int      @default(1)
+  readBy    String   @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, groupKey])
+}
+
+model ActivityEvent {
+  id             String   @id @default(cuid())
+  projectId      String
+  actorId        String
+  actorName      String
+  actorKind      String // human | agent | system
+  action         String
+  target         String?
+  contextVersion Int
+  outcome        String?
+  simulated      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  projectId String
+  authorId  String
+  role      String // human | reviewer | builder | system
+  body      String
+  meta      String   @default("{}")
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
