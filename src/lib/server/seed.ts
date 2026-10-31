@@ -52,10 +52,10 @@ export async function ensureUsers() {
     await db.user.upsert({ where: { id: u.id }, create: { id: u.id, name: u.name, title: u.title, color: u.color }, update: { name: u.name, title: u.title, color: u.color } });
 }
 
-async function scaffold(tx: Tx, projectId: string, withComponents: boolean) {
-  for (const u of USERS) await tx.projectMember.create({ data: { projectId, userId: u.id, role: u.role } });
-  await tx.agent.create({ data: { projectId, key: "reviewer", name: "Reviewer AI", role: "Reviewer / Coordinator" } });
-  await tx.agent.create({ data: { projectId, key: "builder", name: "Builder AI", role: "Builder / Developer" } });
+async function scaffold(tx: Tx, projectId: string, withComponents: boolean, members: { id: string; role: string }[] = USERS) {
+  for (const u of members) await tx.projectMember.create({ data: { projectId, userId: u.id, role: u.role } });
+  await tx.agent.create({ data: { projectId, key: "reviewer", name: "Bunty", role: "AI Strategist" } });
+  await tx.agent.create({ data: { projectId, key: "builder", name: "Babli", role: "AI Builder" } });
   if (withComponents) {
     await tx.component.createMany({ data: COMPONENTS.map(([key, name, category, description]) => ({ projectId, key, name, category, description })) });
     await tx.componentDependency.createMany({ data: COMPONENT_DEPS.map(([fromKey, toKey]) => ({ projectId, fromKey, toKey })) });
@@ -85,7 +85,10 @@ export async function createProject(ownerId: string, name: string, description: 
   await ensureUsers();
   return db.$transaction(async (tx) => {
     const p = await tx.project.create({ data: { name, description, ownerId } });
-    await scaffold(tx, p.id, healthcareComponents);
+    // Demo people share their projects with each other; a real account starts
+    // alone as founder and invites teammates with a link.
+    const members = USERS.some((u) => u.id === ownerId) ? USERS : [{ id: ownerId, role: "founder" }];
+    await scaffold(tx, p.id, healthcareComponents, members);
     if (!healthcareComponents) {
       // Generic component catalogue for non-healthcare products.
       const generic: [string, string, string][] = [

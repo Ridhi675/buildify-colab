@@ -13,30 +13,34 @@ datasource db {
 }
 
 model User {
-  id        String          @id
-  name      String
-  title     String
-  color     String
-  kind      String          @default("human") // human | agent
-  createdAt DateTime        @default(now())
-  members   ProjectMember[]
-  votes     ApprovalVote[]
+  id           String          @id
+  name         String
+  title        String
+  color        String
+  kind         String          @default("human") // human | agent
+  // Real accounts have both; the seeded demo people (Aisha, Daniel, Sam) have neither.
+  email        String?         @unique
+  passwordHash String?
+  createdAt    DateTime        @default(now())
+  members      ProjectMember[]
+  votes        ApprovalVote[]
 }
 
 model Project {
-  id                    String   @id @default(cuid())
-  name                  String
-  description           String
-  ownerId               String
-  isDemo                Boolean  @default(false)
-  contextVersion        Int      @default(0) // latest committed ContextVersion.number
-  currentArtifactVerId  String?
-  phase                 String   @default("requirements") // requirements | preview | build | review | released
-  approvalPolicy        String   @default("{\"major\":2,\"minor\":1,\"release\":2}")
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  name                 String
+  description          String
+  ownerId              String
+  isDemo               Boolean  @default(false)
+  contextVersion       Int      @default(0) // latest committed ContextVersion.number
+  currentArtifactVerId String?
+  phase                String   @default("requirements") // requirements | preview | build | review | released
+  approvalPolicy       String   @default("{\"major\":2,\"minor\":1,\"release\":2}")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   members         ProjectMember[]
+  invites         ProjectInvite[]
   requirements    Requirement[]
   contextVersions ContextVersion[]
   decisions       Decision[]
@@ -66,24 +70,39 @@ model ProjectMember {
   @@unique([projectId, userId])
 }
 
+/// Shareable link that adds whoever opens it to the project with a fixed role.
+model ProjectInvite {
+  id          String    @id @default(cuid())
+  projectId   String
+  token       String    @unique
+  role        String // founder | designer | observer
+  createdById String
+  uses        Int       @default(0)
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
 model Requirement {
-  id                 String   @id @default(cuid())
+  id                 String                @id @default(cuid())
   projectId          String
   key                String // REQ-001
   title              String
   description        String
   category           String // audience | layout | theme | accessibility | feature | performance | data
-  priority           String   @default("medium") // must | high | medium | low
-  status             String   @default("proposed") // proposed | approved | rejected | superseded
-  version            Int      @default(1)
-  acceptanceCriteria String   @default("[]") // JSON string[]
-  components         String   @default("[]") // JSON component keys this requirement drives
+  priority           String                @default("medium") // must | high | medium | low
+  status             String                @default("proposed") // proposed | approved | rejected | superseded
+  version            Int                   @default(1)
+  acceptanceCriteria String                @default("[]") // JSON string[]
+  components         String                @default("[]") // JSON component keys this requirement drives
   originalRequest    String?
   authorId           String
-  source             String   @default("human") // human | reviewer
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  source             String                @default("human") // human | reviewer
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   revisions          RequirementRevision[]
 
   @@unique([projectId, key])
@@ -176,18 +195,18 @@ model Decision {
 }
 
 model Agent {
-  id             String    @id @default(cuid())
+  id             String      @id @default(cuid())
   projectId      String
   key            String // reviewer | builder
   name           String
   role           String
-  status         String    @default("idle") // idle | working | paused | stopped | restarting | offline
+  status         String      @default("idle") // idle | working | paused | stopped | restarting | offline
   currentTaskId  String?
-  contextVersion Int       @default(0) // context version last loaded into this agent
-  epoch          Int       @default(1) // increments on restart; stale epochs cannot commit
-  lastActivityAt DateTime  @default(now())
+  contextVersion Int         @default(0) // context version last loaded into this agent
+  epoch          Int         @default(1) // increments on restart; stale epochs cannot commit
+  lastActivityAt DateTime    @default(now())
   lastAction     String?
-  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tasks          AgentTask[]
   runs           AgentRun[]
 
@@ -246,20 +265,20 @@ model AgentRun {
 }
 
 model ImpactAnalysis {
-  id               String   @id @default(cuid())
-  projectId        String
-  requirementKey   String
-  previousText     String
-  proposedText     String
-  proposedTitle    String
-  severity         String // low | medium | high
-  result           String // JSON ImpactResult
-  status           String   @default("pending") // pending | approved | rejected | modified
-  approvalId       String?
+  id                 String   @id @default(cuid())
+  projectId          String
+  requirementKey     String
+  previousText       String
+  proposedText       String
+  proposedTitle      String
+  severity           String // low | medium | high
+  result             String // JSON ImpactResult
+  status             String   @default("pending") // pending | approved | rejected | modified
+  approvalId         String?
   baseContextVersion Int
-  createdById      String
-  createdAt        DateTime @default(now())
-  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById        String
+  createdAt          DateTime @default(now())
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Preview {

@@ -28,7 +28,10 @@ npm run setup
 npm run dev
 ```
 
-Open http://localhost:3000, pick **Aisha (Founder)**. Open a second tab or browser, pick **Daniel (Designer)**. Open **CareConnect** in both — the demo guide in the corner walks through all 17 steps and ticks them off from live state.
+Open http://localhost:3000 and either:
+
+- **Use your own account** — create an account, create a project, then click **Invite** in the workspace to copy a link for a teammate. They open it on their own computer, sign in or sign up, and join with the role you picked (founder, designer or observer).
+- **Try the demo** — under "Or explore the CareConnect demo as", pick **Aisha (Founder)**. Open a second tab or browser, pick **Daniel (Designer)**. Open **CareConnect** in both — the demo guide in the corner walks through all 17 steps and ticks them off from live state. Demo people are shared by everyone and cannot join real projects.
 
 - No `ANTHROPIC_API_KEY`? Everything still works: agents use a deterministic rules engine and every output is labelled **Rules engine**. Set the key to switch to the LLM (labelled **LLM**).
 - Reset the demo at any time from the demo guide (or `npm run db:seed`).
@@ -39,7 +42,7 @@ Open http://localhost:3000, pick **Aisha (Founder)**. Open a second tab or brows
 npm test
 ```
 
-20 tests: engine unit tests (simplification, fingerprints, stale detection, ripple traversal, impact-aware rebuild) and a full demo scenario against a real SQLite DB using the real task runner (two-human approval gate, observer permissions, parallel agents, mid-flight change, quarantine, conflict detection, restart/recovery, rebuild/validation/approval, compare, safe restore, pause/resume/stop).
+24 tests: accounts and invite links (password hashing, sign-up/sign-in, invite join/revoke, observer and demo restrictions), engine unit tests (simplification, fingerprints, stale detection, ripple traversal, impact-aware rebuild) and a full demo scenario against a real SQLite DB using the real task runner (two-human approval gate, observer permissions, parallel agents, mid-flight change, quarantine, conflict detection, restart/recovery, rebuild/validation/approval, compare, safe restore, pause/resume/stop).
 
 ## Architecture
 
@@ -78,7 +81,7 @@ More: [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md), [docs/DEMO_SCRIPT.md](do
 | Variable | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `file:./dev.db` | SQLite path (relative to `prisma/`) or a Postgres URL |
-| `AUTH_SECRET` | — | HMAC secret for demo session tokens |
+| `AUTH_SECRET` | — | HMAC secret for session tokens. **Required in production** — the server refuses to sign in without it |
 | `ANTHROPIC_API_KEY` | empty | Enables the LLM path |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5` if unset | Model id |
 | `BC_LLM_EFFORT` | `medium` | Effort level for LLM calls |
@@ -98,15 +101,15 @@ Change `provider = "sqlite"` to `"postgresql"` in `prisma/schema.prisma`, set `D
 The app needs a **long-running Node process** (SSE connections and in-process agent jobs), so serverless platforms are not a fit. Suggested: Render, Railway or Fly.io.
 
 1. Use Postgres (above) or a persistent volume for SQLite.
-2. Build command: `npm ci && npx prisma db push && npm run build`
-3. Start command: `npm start`; set `AUTH_SECRET` (and optionally `ANTHROPIC_API_KEY`).
+2. Build command: `npm ci && npx prisma db push && npm run build`. On a database created before accounts existed, Prisma asks to confirm adding the unique `email` column; existing users have no email, so `npx prisma db push --accept-data-loss` is safe for that one change.
+3. Start command: `npm start`; set `AUTH_SECRET` to a long random value (and optionally `ANTHROPIC_API_KEY`). Serve it over HTTPS so passwords and session tokens are encrypted in transit.
 4. Run `npm run db:seed` once for the demo project.
 
 Run a single instance — the realtime hub is in-memory. No public deployment has been made from this repository yet.
 
 ## Security notes
 
-Project membership is checked on every API route; inputs are validated with Zod; observers are read/comment-only; AI agents cannot vote; retries and timeouts are bounded; cancellation is cooperative and late outputs are rejected; all state changes run in transactions and are written to an audit log. Demo identities are not real authentication.
+Project membership is checked on every API route; inputs are validated with Zod; observers are read/comment-only; AI agents cannot vote; retries and timeouts are bounded; cancellation is cooperative and late outputs are rejected; all state changes run in transactions and are written to an audit log. Accounts use email + password (scrypt-hashed, never sent to the browser) with a small per-email lockout after repeated failures; sessions are HMAC-signed tokens kept in the browser, so each computer signs in separately. Invite links add the person who opens them with a fixed role, can be revoked, and are hidden from observers. The seeded demo people have no password and are limited to the demo; there is no email verification or password reset yet.
 
 ## Developer tooling
 

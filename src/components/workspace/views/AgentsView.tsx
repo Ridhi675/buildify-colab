@@ -4,6 +4,7 @@ import { Bot, CornerUpRight, Pause, Play, Power, RotateCw, Search, Share2, Squar
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn, timeAgo, type State } from "../../client";
+import { agentColor } from "../../effects";
 import { Badge, Button, Card, CardHeader, Field, inputCls, Modal, SourceBadge, StatusBadge } from "../../ui";
 import { SimulatedNote, useNames, useWs } from "../shared";
 
@@ -63,7 +64,7 @@ function AgentCard({ agent, onInspect }: { agent: State["agents"][number]; onIns
   const pendingMine = state.approvals.filter((a) => a.status === "pending" && a.createdById === agent.id).length;
   const recovery = [...state.chat].reverse().find((c) => c.authorId === agent.id && (c.meta as { recovery?: unknown }).recovery);
   const behind = agent.contextVersion < state.project.contextVersion;
-  const color = agent.key === "reviewer" ? "#7c3aed" : "#0891b2";
+  const color = agentColor(agent.key);
   const readOnly = state.me.role === "observer";
   const ctl = (t: Task, op: string, ok: string) => run({ type: "task_control", taskId: t.id, op }, ok);
 
@@ -219,7 +220,7 @@ function InspectModal({ task, onClose }: { task: Task | null; onClose: () => voi
           {!task.runs.length && <div className="text-xs text-slate-400">Not started.</div>}
         </Section>
         {task.validation && <Section title="Validation"><pre className="max-h-48 overflow-auto rounded-lg bg-slate-50 p-2 text-[11px]">{JSON.stringify(task.validation, null, 2)}</pre></Section>}
-        <Section title="Structured output"><pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{out?.result ? JSON.stringify(out.result, null, 2) : "—"}</pre></Section>
+        <Section title="Structured output"><pre className="max-h-72 overflow-auto rounded-xl bg-[var(--terminal-bg)] p-3 text-[11px] text-[var(--terminal-fg)]">{out?.result ? JSON.stringify(out.result, null, 2) : "—"}</pre></Section>
         <p className="text-[11px] text-slate-500">Shown: inputs, context version, actions, output and validation. Hidden model reasoning is not stored or displayed.</p>
       </div>
     </Modal>

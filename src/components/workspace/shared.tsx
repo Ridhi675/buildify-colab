@@ -3,6 +3,7 @@
 import { AlertTriangle, Bot, CheckCircle2, MessageSquare, RotateCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Cursor, Lock, Presence, State } from "../client";
+import { agentColor } from "../effects";
 import { cn, timeAgo } from "../client";
 import { Avatar, Badge, Button, inputCls, SourceBadge, StatusBadge } from "../ui";
 
@@ -29,8 +30,8 @@ export function useNames() {
   const { state } = useWs();
   const map = new Map<string, { name: string; color: string; kind: "human" | "agent" | "system" }>();
   for (const m of state.members) map.set(m.userId, { name: m.name, color: m.color, kind: "human" });
-  for (const a of state.agents) map.set(a.id, { name: a.name, color: a.key === "reviewer" ? "#7c3aed" : "#0891b2", kind: "agent" });
-  return (id: string) => map.get(id) ?? { name: id === "system" ? "System" : id, color: "#94a3b8", kind: "system" as const };
+  for (const a of state.agents) map.set(a.id, { name: a.name, color: agentColor(a.key), kind: "agent" });
+  return (id: string) => map.get(id) ?? { name: id === "system" ? "System" : id, color: "var(--muted-foreground)", kind: "system" as const };
 }
 
 export const canVote = (s: State) => s.me.role !== "observer";
@@ -54,7 +55,7 @@ export function ApprovalCard({ a, compact }: { a: State["approvals"][number]; co
   const stale = a.contextVersion < state.project.contextVersion && a.status === "pending";
 
   return (
-    <div className={cn("rounded-xl border bg-white p-3", a.status === "pending" ? "border-amber-200" : "border-slate-200")}>
+    <div className={cn("rounded-xl border bg-surface p-3", a.status === "pending" ? "border-amber-200" : "border-slate-200")}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{KIND_LABEL[a.kind] ?? a.kind}</div>
@@ -79,7 +80,7 @@ export function ApprovalCard({ a, compact }: { a: State["approvals"][number]; co
         <div className="mt-2 flex gap-2 rounded-lg bg-violet-50 p-2 text-xs text-violet-900">
           <Bot size={14} className="mt-0.5 shrink-0" />
           <div>
-            <span className="font-medium">Reviewer AI recommends “{rec.verdict}”</span> — advisory only, humans decide. {!compact && rec.rationale}
+            <span className="font-medium">Bunty recommends “{rec.verdict}”</span> — advisory only, humans decide. {!compact && rec.rationale}
           </div>
         </div>
       )}
@@ -119,7 +120,7 @@ export function ChatPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-2 scroll-thin">
-        {state.chat.length === 0 && <div className="py-6 text-center text-xs text-slate-500">Ask the Reviewer AI what changed, or describe what you want to build.</div>}
+        {state.chat.length === 0 && <div className="py-6 text-center text-xs text-slate-500">Ask Bunty what changed, or describe what you want to build.</div>}
         {state.chat.map((c) => {
           const who = name(c.authorId);
           const ai = c.role !== "human";
@@ -127,7 +128,7 @@ export function ChatPanel() {
           return (
             <div key={c.id} className={cn("flex gap-2", !ai && c.authorId === state.me.id && "flex-row-reverse")}>
               {ai ? <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white" style={{ background: who.color }}><Bot size={13} /></span> : <Avatar name={who.name} color={who.color} size={24} />}
-              <div className={cn("max-w-[85%] rounded-xl px-2.5 py-1.5 text-xs leading-relaxed", ai ? "bg-slate-100 text-slate-800" : c.authorId === state.me.id ? "bg-indigo-600 text-white" : "bg-white ring-1 ring-slate-200")}>
+              <div className={cn("max-w-[85%] rounded-xl px-2.5 py-1.5 text-xs leading-relaxed", ai ? "bg-slate-100 text-slate-800" : c.authorId === state.me.id ? "bg-indigo-600 text-white" : "bg-surface ring-1 ring-slate-200")}>
                 <div className="mb-0.5 flex items-center gap-1.5 text-[10px] opacity-75">
                   <span className="font-medium">{who.name}</span>· {timeAgo(c.createdAt)} {ai && <SourceBadge source={meta.source} />}
                 </div>
@@ -148,7 +149,7 @@ export function ChatPanel() {
           await run({ type: "chat", message: m });
         }}
       >
-        <input className={cn(inputCls, "py-1.5 text-xs")} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Message Reviewer AI…" aria-label="Message Reviewer AI" />
+        <input className={cn(inputCls, "py-1.5 text-xs")} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Message Bunty…" aria-label="Message Bunty" />
         <Button size="sm" variant="primary" type="submit" aria-label="Send"><Send size={12} /></Button>
       </form>
     </div>

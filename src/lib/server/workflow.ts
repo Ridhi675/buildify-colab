@@ -66,7 +66,7 @@ export async function decideProposed(projectId: string, actor: Actor, keys: stri
         contextVersion: 0,
         affectedRequirements: j.str(rows.map((r) => r.key)),
         affectedComponents: j.str([...new Set(rows.flatMap((r) => j.parse<string[]>(r.components, [])))]),
-        agentContributions: j.str(["Reviewer AI simplified the request"]),
+        agentContributions: j.str(["Bunty simplified the request"]),
       },
     });
     const cv = await commitContext(tx, projectId, `Approved ${rows.map((r) => r.key).join(", ")}`, actor.id, decisionRow.id);
@@ -226,7 +226,7 @@ async function applyChange(tx: Tx, projectId: string, impactId: string, approver
       contextVersion: 0,
       affectedRequirements: j.str(result.affectedRequirements.map((x) => x.key)),
       affectedComponents: j.str(result.affectedComponents.map((x) => x.key)),
-      agentContributions: j.str(["Dependency engine computed impact", ...(result.inferred?.length ? ["Reviewer AI added inferred consequences"] : [])]),
+      agentContributions: j.str(["Dependency engine computed impact", ...(result.inferred?.length ? ["Bunty added inferred consequences"] : [])]),
     },
   });
   const cv = await commitContext(tx, projectId, `${r.key} v${version}: ${ia.proposedTitle}`, actor.id, decision.id);
@@ -332,7 +332,7 @@ async function onApproved(tx: Tx, projectId: string, kind: string, payload: Reco
     const pv = await tx.preview.update({ where: { id: payload.previewId }, data: { status: "approved" } });
     const artifact = (await tx.artifact.findFirst({ where: { projectId } })) ?? (await tx.artifact.create({ data: { projectId, name: p.name } }));
     const decision = await tx.decision.create({
-      data: { projectId, title: `Preview #${pv.number} approved`, summary: "Visual and textual preview accepted as the build target", reason: "Preview-first gate passed", kind: "preview", proposedById: reviewer.id, approvedByIds: j.str(approvers), contextVersion: p.contextVersion, agentContributions: j.str(["Reviewer AI generated the preview"]) },
+      data: { projectId, title: `Preview #${pv.number} approved`, summary: "Visual and textual preview accepted as the build target", reason: "Preview-first gate passed", kind: "preview", proposedById: reviewer.id, approvedByIds: j.str(approvers), contextVersion: p.contextVersion, agentContributions: j.str(["Bunty generated the preview"]) },
     });
     const av = await createArtifactVersion(tx, projectId, artifact.id, `Approved preview #${pv.number}`, pv.spec, actor.id, decision.id, null, ["initial version"]);
     await tx.project.update({ where: { id: projectId }, data: { currentArtifactVerId: av.id, phase: "build" } });
@@ -375,7 +375,7 @@ async function onApproved(tx: Tx, projectId: string, kind: string, payload: Reco
         approvedByIds: j.str(approvers),
         contextVersion: p.contextVersion,
         affectedComponents: j.str(out.result.changed),
-        agentContributions: j.str(["Builder AI generated components", "Reviewer AI validated against acceptance checks"]),
+        agentContributions: j.str(["Babli generated components", "Bunty validated against acceptance checks"]),
       },
     });
     const av = await createArtifactVersion(tx, projectId, artifact.id, decision.title, j.str(out.result.spec), builder.id, decision.id, prev?.id ?? null, out.result.changed);
