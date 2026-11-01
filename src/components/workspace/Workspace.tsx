@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Bell, Bot, History, LayoutDashboard, Link2, Rows3, Settings, Sparkles, Waves } from "lucide-react";
+import { Activity, Bell, Bot, History, LayoutDashboard, Link2, Settings, Sparkles, Waves } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,7 +15,6 @@ import { ChatDock } from "./ChatDock";
 import { WorkspaceView } from "./views/WorkspaceView";
 import { AgentsView } from "./views/AgentsView";
 import { RippleView } from "./views/RippleView";
-import { SwimlaneView } from "./views/SwimlaneView";
 import { TimelineView } from "./views/TimelineView";
 import { ActivityView } from "./views/ActivityView";
 import { SettingsView } from "./views/SettingsView";
@@ -26,13 +25,12 @@ const NAV = [
   { key: "workspace", label: "Workspace", icon: LayoutDashboard },
   { key: "agents", label: "Agents", icon: Bot },
   { key: "ripple", label: "Ripple", icon: Waves },
-  { key: "swimlane", label: "Swimlane", icon: Rows3 },
   { key: "checkpoints", label: "Checkpoints", icon: History },
   { key: "history", label: "History", icon: Activity },
 ];
 
 // Old view names still open the right page (bookmarks, notifications, the demo guide).
-const ALIAS: Record<string, string> = { preview: "workspace", graph: "swimlane", timeline: "checkpoints", activity: "history" };
+const ALIAS: Record<string, string> = { preview: "workspace", graph: "history", swimlane: "history", timeline: "checkpoints", activity: "history" };
 
 export function Workspace({ projectId, view: rawView }: { projectId: string; view: string }) {
   const view = ALIAS[rawView] ?? rawView;
@@ -220,7 +218,6 @@ export function Workspace({ projectId, view: rawView }: { projectId: string; vie
             {view === "workspace" && <WorkspaceView />}
             {view === "agents" && <AgentsView />}
             {view === "ripple" && <RippleView />}
-            {view === "swimlane" && <SwimlaneView />}
             {view === "checkpoints" && <TimelineView />}
             {view === "history" && <ActivityView />}
             {view === "settings" && <SettingsView />}
