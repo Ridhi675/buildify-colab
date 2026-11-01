@@ -239,6 +239,28 @@ body {
   color: var(--foreground);
 }
 
+/* Retro pixel-hand cursor everywhere; hotspot is the fingertip. Text fields keep
+   the text cursor, and utilities such as cursor-not-allowed still win. */
+@layer base {
+  html,
+  a,
+  button,
+  summary,
+  select,
+  label,
+  [role="button"],
+  [role="tab"],
+  [role="switch"] {
+    cursor: url("/cursor-hand.svg") 8 1, auto;
+  }
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]),
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
+  }
+}
+.cursor-pointer { cursor: url("/cursor-hand.svg") 8 1, pointer; }
+
 body {
   -webkit-font-smoothing: antialiased;
 }
@@ -279,21 +301,6 @@ body {
 
 /* Cursor-reactive backdrop. --mx/--my/--px/--py come from CursorBackground. */
 .cursor-parallax { transform: translate3d(calc(var(--px, 0) * var(--depth)), calc(var(--py, 0) * var(--depth)), 0); }
-/* A dim, light square that follows the pointer. No glow; transform only. */
-.cursor-square {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--accent) 7%, transparent);
-  border: 1px solid color-mix(in oklab, var(--accent) 18%, transparent);
-  transform: translate3d(calc(var(--mx, -200px) - 32px), calc(var(--my, -200px) - 32px), 0);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-.cursor-bg[data-active] .cursor-square { opacity: 1; }
 
 /* Pipeline: each step lights up in turn; a pulse travels along each connector.
    Only opacity and transform animate, so nothing repaints per frame. */

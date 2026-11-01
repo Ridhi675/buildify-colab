@@ -3,8 +3,7 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Full-page backdrop that follows the cursor: a dim light square under the
- * pointer, a faint grid, and colour blobs with a little parallax.
+ * Full-page backdrop: a faint grid and colour blobs that drift a little with the cursor (parallax).
  * The cursor position eases toward the pointer in a rAF loop that only runs
  * while it is catching up, and only CSS variables change (no React renders).
  */
@@ -37,7 +36,6 @@ export function CursorBackground() {
       if (e.pointerType !== "mouse") return;
       tx = e.clientX;
       ty = e.clientY;
-      el.dataset.active = "";
       if (reduce) {
         x = tx;
         y = ty;
@@ -65,7 +63,6 @@ export function CursorBackground() {
       <div className="absolute inset-0 overflow-hidden">
         <div className="bg-grid bg-grid-drift" />
       </div>
-      <div className="cursor-square" />
       <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background to-transparent" />
     </div>
   );

@@ -7,6 +7,7 @@ import { agentColor, onGlowMove, OrbitLogo } from "../../effects";
 import { Badge, Button, Card, CardHeader, Empty, Field, inputCls, Modal, StatusBadge } from "../../ui";
 import { ApprovalCard, DraftStatus, useLiveDraft, useNames, useWs } from "../shared";
 import { PreviewSection } from "./PreviewStudio";
+import { ReferenceChips, UploadReferenceButton } from "../References";
 
 type Req = State["requirements"][number];
 
@@ -83,11 +84,15 @@ function RequestPanel() {
               </button>
             )}
             {running && <Badge tone="indigo"><span className="animate-pulse-soft">●</span> Bunty: {running.phaseLabel}</Badge>}
-            <Button variant="primary" className="ml-auto" disabled={!text.trim() || readOnly} onClick={submit}>
-              <Wand2 size={15} /> Simplify with Bunty <ArrowUp size={15} />
-            </Button>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              <UploadReferenceButton />
+              <Button variant="primary" disabled={!text.trim() || readOnly} onClick={submit}>
+                <Wand2 size={15} /> Simplify with Bunty <ArrowUp size={15} />
+              </Button>
+            </div>
           </div>
         </div>
+        <ReferenceChips />
         <div className="mt-3 text-[11px] text-muted-foreground">Ctrl/Cmd + Enter to send</div>
       </div>
     </section>

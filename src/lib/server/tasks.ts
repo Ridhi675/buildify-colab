@@ -23,6 +23,7 @@ import {
   type Actor,
 } from "./core";
 import { changed } from "./realtime";
+import { referenceNotes } from "./references";
 
 export const PHASES: Record<string, string[]> = {
   simplify: ["Reading request", "Extracting requirements", "Checking for ambiguity"],
@@ -243,8 +244,11 @@ interface WorkOut {
 
 /** Every piece of preview feedback in the project, oldest first (generation notes + "request changes" comments). */
 async function designFeedback(projectId: string, extra?: unknown): Promise<string[]> {
-  const previews = await db.preview.findMany({ where: { projectId }, orderBy: { number: "asc" }, select: { feedback: true } });
-  const all = previews.flatMap((p) => j.parse<string[]>(p.feedback, []));
+  const previews = await db.preview.findMany({ where: { projectId }, orderBy: { number: "asc" }, select: { feedback: true, createdAt: true } });
+  // References and preview feedback apply in the order they happened: the newest wins.
+  const all = [...(await referenceNotes(projectId)), ...previews.flatMap((p) => j.parse<string[]>(p.feedback, []).map((text) => ({ at: p.createdAt, text })))]
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .map((n) => n.text);
   return typeof extra === "string" && extra.trim() ? [...all, extra.trim()] : all;
 }
 

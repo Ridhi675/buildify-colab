@@ -28,6 +28,8 @@ export async function getState(projectId: string) {
       notifications: { orderBy: { updatedAt: "desc" }, take: 40 },
       activity: { orderBy: { createdAt: "desc" }, take: 150 },
       chat: { orderBy: { createdAt: "asc" }, take: 150 },
+      // Everything except the full file, which only preview generation needs.
+      references: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, kind: true, thumb: true, palette: true, accent: true, mode: true, layout: true, note: true, createdById: true, createdAt: true } },
     },
   });
   const [reqDeps, compDeps, versions] = await Promise.all([
@@ -49,6 +51,7 @@ export async function getState(projectId: string) {
       policy: { ...POLICY_DEFAULT, ...j.parse(p.approvalPolicy, {}) },
     },
     members: p.members.map((m) => ({ userId: m.userId, role: m.role, name: m.user.name, title: m.user.title, color: m.user.color })),
+    references: p.references.map((r) => ({ ...r, palette: j.parse<string[]>(r.palette, []) })),
     presence: presenceList(projectId),
     locks: lockList(projectId),
     requirements: p.requirements.map((r) => ({

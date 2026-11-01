@@ -10,6 +10,7 @@ import { resetDemo, DEMO_ID } from "./seed";
 import { HttpError } from "./auth";
 import { db } from "../db";
 import { createInvite, revokeInvite, ROLES } from "./accounts";
+import { addReference, ReferenceInput, removeReference } from "./references";
 
 const id = z.string().min(1).max(64);
 const text = (max = 2000) => z.string().trim().min(1).max(max);
@@ -43,6 +44,8 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mark_read") }),
   z.object({ type: z.literal("reset_demo") }),
   z.object({ type: z.literal("create_invite"), role: z.enum(ROLES) }),
+  z.object({ type: z.literal("add_reference"), reference: ReferenceInput }),
+  z.object({ type: z.literal("remove_reference"), id }),
   z.object({ type: z.literal("revoke_invite"), inviteId: id }),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
@@ -108,6 +111,8 @@ export async function dispatch(projectId: string, user: { id: string; name: stri
       await wf.markRead(projectId, user.id);
       return { ok: true };
     case "create_invite": return createInvite(projectId, actor, a.role);
+    case "add_reference": return addReference(projectId, actor, a.reference);
+    case "remove_reference": return removeReference(projectId, actor, a.id);
     case "revoke_invite": return revokeInvite(projectId, actor, a.inviteId);
     case "reset_demo": {
       if (projectId !== DEMO_ID) throw new HttpError(400, "Only the demo project can be reset");

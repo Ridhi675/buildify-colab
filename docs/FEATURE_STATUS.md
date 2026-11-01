@@ -23,7 +23,8 @@
 - Checkpoints: versions with their own saved spec + requirements, decision explanations, compare two versions (visual, requirements, decisions, actors, reasons), safe restore
 - Approvals: configurable policy (1 or 2 humans for major/minor/release); Reviewer recommendations are advisory and labelled; AI can never vote
 - Notifications in five categories with grouping; @mentions; activity feed with actor, action, target, context version, outcome; Ctrl/Cmd+Shift+N/M/A
-- Swimlane: one lane per person and agent, every recorded step in order (History lists the same events newest first)
+- Design references (optional): upload a website screenshot or HTML/CSS template next to "Simplify with Bunty"; the browser extracts colours, light/dark and layout, and previews and builds follow them (newest of references and preview feedback wins); up to 6 per project, removable
+- Ripple Effect in plain language: before/after, change size, what users notice, which parts change or stay the same, what work is redone; the technical breakdown is folded under "Technical details"
 - Bunty chat dock: a button at the bottom right opens a side panel that can be resized by dragging its edge and closed again; width and open state are remembered per browser
 
 ## Partial
