@@ -34,7 +34,7 @@ export function TimelineView() {
   return (
     <div className="mx-auto max-w-7xl space-y-5">
       <Card>
-        <CardHeader icon={<History size={16} />} title="Decision Time Machine" subtitle="Every significant approved decision, the exact saved prototype for each version, and safe restore that never erases history." actions={<Tabs value={mode} onChange={setMode} items={[{ value: "inspect", label: "Inspect" }, { value: "compare", label: "Compare" }, { value: "restore", label: "Restore" }]} />} />
+        <CardHeader icon={<History size={16} />} title="Versions and decisions" subtitle="Every significant approved decision, the exact saved prototype for each version, and safe restore that never erases history." actions={<Tabs value={mode} onChange={setMode} items={[{ value: "inspect", label: "Inspect" }, { value: "compare", label: "Compare" }, { value: "restore", label: "Restore" }]} />} />
         <div className="flex gap-3 overflow-x-auto p-4 scroll-thin">
           {versions.map((v, i) => (
             <div key={v.id} className="flex items-center gap-3">
@@ -44,7 +44,7 @@ export function TimelineView() {
                   {v.id === state.project.currentArtifactVerId ? <Badge tone="emerald">current</Badge> : <Badge>historical</Badge>}
                 </div>
                 <div className="mt-1 line-clamp-2 text-xs font-medium text-slate-800">{v.label}</div>
-                <div className="mt-1 text-[11px] text-slate-500">context v{v.contextVersion} · {timeAgo(v.createdAt)}</div>
+                <div className="mt-1 text-[11px] text-slate-500">{timeAgo(v.createdAt)}</div>
                 {v.derivedFromId && <div className="text-[11px] text-violet-700">derived from v{versions.find((x) => x.id === v.derivedFromId)?.number}</div>}
               </button>
               {i < versions.length - 1 && <ArrowRight size={16} className="shrink-0 text-slate-300" />}
@@ -82,7 +82,7 @@ function DecisionList({ onOpen }: { onOpen: (d: Decision) => void }) {
                   <span className="font-medium text-slate-900">{d.title}</span>
                   <Badge>{d.kind}</Badge>
                   {v && <Badge tone="emerald">→ v{v.number}</Badge>}
-                  <Badge tone="indigo">ctx v{d.contextVersion}</Badge>
+                  
                 </div>
                 <div className="mt-0.5 text-xs text-slate-600">{d.reason}</div>
                 <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -271,7 +271,7 @@ function DecisionModal({ d, onClose }: { d: Decision | null; onClose: () => void
   return (
     <Modal open onClose={onClose} title={d.title}>
       <div className="space-y-3 text-sm">
-        <div className="flex flex-wrap gap-1.5"><Badge>{d.kind}</Badge><Badge tone="indigo">context v{d.contextVersion}</Badge><StatusBadge status={d.status} /></div>
+        <div className="flex flex-wrap gap-1.5"><Badge>{d.kind}</Badge><StatusBadge status={d.status} /></div>
         <Row k="Who proposed it">{name(d.proposedById).name}</Row>
         <Row k="Who approved it">{d.approvedByIds.map((x) => name(x).name).join(", ") || "—"}</Row>
         <Row k="Why">{d.reason}</Row>

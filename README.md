@@ -73,6 +73,7 @@ Key ideas:
 - **Epochs.** Restarting an agent bumps its epoch; every runner write is guarded by epoch, so pre-restart work can never commit.
 - **Deterministic first, AI second.** Ripple Effect uses requirement and component graphs plus a simulated rebuild diff; AI additions are labelled *inferred*.
 - **Safe artifact.** Previews and builds are JSON AppSpecs rendered by a whitelist renderer — no generated code is executed.
+- **A real website at the end.** Any preview or built version can be opened as a standalone website or downloaded as a single HTML file (Workspace → Preview → **Open website**, **Download**) and hosted on any static host.
 
 More: [docs/FEATURE_STATUS.md](docs/FEATURE_STATUS.md), [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md), [docs/SOLUTION.md](docs/SOLUTION.md), [docs/PROGRESS.md](docs/PROGRESS.md).
 

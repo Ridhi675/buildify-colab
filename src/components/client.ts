@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProjectState } from "@/lib/server/state";
+import type { Draft } from "@/lib/server/realtime";
+
+export type { Draft };
 
 // Per-tab identity: sessionStorage lets two tabs act as two different humans.
 const KEY = "bc_token";
@@ -85,6 +88,7 @@ export function useProject(projectId: string) {
   const [presence, setPresence] = useState<Presence[]>([]);
   const [locks, setLocks] = useState<Lock[]>([]);
   const [cursors, setCursors] = useState<Record<string, Cursor>>({});
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inflight = useRef(false);
   const again = useRef(false);
@@ -127,6 +131,10 @@ export function useProject(projectId: string) {
         setLocks(e.locks);
       } else if (e.type === "cursor") {
         setCursors((c) => ({ ...c, [e.userId]: { ...e, at: Date.now() } }));
+      } else if (e.type === "drafts") {
+        setDrafts(Object.fromEntries((e.drafts as Draft[]).map((d) => [d.field, d])));
+      } else if (e.type === "draft") {
+        setDrafts((d) => ({ ...d, [e.draft.field]: e.draft }));
       }
     };
     // Safety net: periodic refresh in case an event was missed while reconnecting.
@@ -142,7 +150,7 @@ export function useProject(projectId: string) {
     [projectId],
   );
 
-  return { state, error, connected, presence, locks, cursors, refresh, act };
+  return { state, error, connected, presence, locks, cursors, drafts, refresh, act };
 }
 
 export function timeAgo(d: string | Date) {

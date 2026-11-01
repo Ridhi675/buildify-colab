@@ -5,7 +5,7 @@
 
 import { db, j, type Tx } from "../db";
 import { checkStale, fingerprint, type Fingerprint } from "../engine/context";
-import { rebuildSpec } from "../engine/spec";
+import { applyDesignFeedback, deriveTheme, rebuildSpec } from "../engine/spec";
 import * as ai from "../ai/agents";
 import type { AppSpec, ImpactResult, SimplifyResult } from "../types";
 import {
@@ -28,7 +28,7 @@ export const PHASES: Record<string, string[]> = {
   simplify: ["Reading request", "Extracting requirements", "Checking for ambiguity"],
   acceptance: ["Loading approved context", "Drafting acceptance checks", "Listing risks"],
   build_plan: ["Loading approved context", "Mapping components", "Estimating effort"],
-  preview: ["Loading approved context", "Composing layout and theme", "Writing textual spec"],
+  preview: ["Loading approved context", "Composing layout and theme", "Drawing the preview"],
   build: ["Loading approved context", "Planning components", "Generating components", "Assembling artifact"],
   validate: ["Loading builder output", "Running acceptance checks", "Writing recommendation"],
   impact: ["Reading dependency analysis", "Looking for missed consequences"],
@@ -241,6 +241,13 @@ interface WorkOut {
   note?: string;
 }
 
+/** Every piece of preview feedback in the project, oldest first (generation notes + "request changes" comments). */
+async function designFeedback(projectId: string, extra?: unknown): Promise<string[]> {
+  const previews = await db.preview.findMany({ where: { projectId }, orderBy: { number: "asc" }, select: { feedback: true } });
+  const all = previews.flatMap((p) => j.parse<string[]>(p.feedback, []));
+  return typeof extra === "string" && extra.trim() ? [...all, extra.trim()] : all;
+}
+
 async function doWork(task: TaskRow, appName: string): Promise<WorkOut> {
   const input = j.parse<Record<string, unknown>>(task.input, {});
   // Agents work from the context version they were started with — not the live state.
@@ -263,24 +270,15 @@ async function doWork(task: TaskRow, appName: string): Promise<WorkOut> {
       return pack(o, { result: o.data, source: o.source });
     }
     case "preview": {
-      const spec = await ai.generateSpec(reqs, appName);
-      const textual = await ai.generateTextual(reqs, spec.data);
-      return {
-        scratch: { result: { spec: spec.data, textual: textual.data }, source: spec.source },
-        source: spec.source,
-        model: spec.model,
-        tokensIn: spec.tokensIn + textual.tokensIn,
-        tokensOut: spec.tokensOut + textual.tokensOut,
-        costUsd: spec.costUsd + textual.costUsd,
-        note: spec.note ?? textual.note,
-      };
+      const spec = await ai.generateSpec(reqs, appName, undefined, await designFeedback(task.projectId, input.feedback));
+      return pack(spec, { result: { spec: spec.data }, source: spec.source });
     }
     case "build": {
       const affected = Array.isArray(input.affected) ? new Set(input.affected as string[]) : undefined;
       const base = input.baseArtifactVersionId
         ? await db.artifactVersion.findUnique({ where: { id: String(input.baseArtifactVersionId) } })
         : null;
-      const o = await ai.generateSpec(reqs, appName, affected);
+      const o = await ai.generateSpec(reqs, appName, affected, await designFeedback(task.projectId));
       let spec = o.data;
       let changedKeys: string[] = [];
       if (base) {
@@ -296,7 +294,8 @@ async function doWork(task: TaskRow, appName: string): Promise<WorkOut> {
       const spec = j.parse<{ result?: { spec: AppSpec } }>(bt?.output, {}).result?.spec;
       if (!spec) throw new Error("Builder output not found");
       const current = await loadReqs(db, task.projectId); // validate against the CURRENT context
-      const v = ai.validateSpec(spec, current);
+      const { applied } = applyDesignFeedback(deriveTheme(current), await designFeedback(task.projectId));
+      const v = ai.validateSpec(spec, current, applied);
       return { scratch: { result: v, source: "rules" }, source: "rules" as const, tokensIn: 0, tokensOut: 0, costUsd: 0 };
     }
     case "impact": {
@@ -383,11 +382,12 @@ async function commitTask(taskId: string, epoch: number, scratch: Record<string,
         break;
       }
       case "preview": {
-        const { spec, textual } = result as { spec: AppSpec; textual: unknown };
+        const { spec } = result as { spec: AppSpec };
+        const fb = String(j.parse<{ feedback?: string }>(task.input, {}).feedback ?? "").trim();
         const n = (await tx.preview.count({ where: { projectId } })) + 1;
         const p = await tx.project.findUniqueOrThrow({ where: { id: projectId } });
         const preview = await tx.preview.create({
-          data: { projectId, number: n, spec: j.str(spec), textual: j.str(textual), contextVersion: task.baseContextVersion, source: String(scratch.source ?? "rules") },
+          data: { projectId, number: n, spec: j.str(spec), textual: "{}", contextVersion: task.baseContextVersion, source: String(scratch.source ?? "rules"), feedback: j.str(fb ? [fb] : []) },
         });
         const pol = await policy(tx, projectId);
         await tx.approvalRequest.create({
@@ -395,7 +395,7 @@ async function commitTask(taskId: string, epoch: number, scratch: Record<string,
             projectId,
             kind: "preview",
             title: `Approve preview #${n}`,
-            summary: `Visual + textual preview generated from context v${task.baseContextVersion}. The Builder cannot start full generation until this is approved.`,
+            summary: `Preview generated from the approved requirements. The Builder cannot start full generation until this is approved.`,
             payload: j.str({ previewId: preview.id }),
             requiredApprovals: pol.major,
             contextVersion: p.contextVersion,
@@ -506,7 +506,7 @@ export async function proposeRebuild(tx: Tx, projectId: string, why: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Controls (Agent Control Centre)
+// Controls (Agents view)
 // ---------------------------------------------------------------------------
 
 export async function controlTask(projectId: string, actor: Actor, taskId: string, op: "pause" | "resume" | "stop" | "retry") {

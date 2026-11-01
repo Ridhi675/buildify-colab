@@ -13,7 +13,7 @@ export interface PresenceEntry {
 }
 
 export interface BusEvent {
-  type: "changed" | "presence" | "cursor" | "toast";
+  type: "changed" | "presence" | "cursor" | "toast" | "draft" | "drafts";
   [k: string]: unknown;
 }
 
@@ -23,6 +23,22 @@ interface Hub {
   listeners: Map<string, Set<Listener>>;
   presence: Map<string, Map<string, PresenceEntry>>;
   locks: Map<string, Map<string, { userId: string; name: string; at: number }>>;
+  drafts?: Map<string, Map<string, Draft>>;
+}
+
+/** Prompt boxes everyone in the project types into together. */
+export const DRAFT_FIELDS = ["request", "preview-feedback", "chat"] as const;
+export type DraftField = (typeof DRAFT_FIELDS)[number];
+
+/** Live, unsent prompt text. Last write wins; `clientId` lets each tab ignore its own echo. */
+export interface Draft {
+  field: DraftField;
+  text: string;
+  userId: string;
+  name: string;
+  color: string;
+  clientId: string;
+  at: number;
 }
 
 const g = globalThis as unknown as { __bcHub?: Hub };
@@ -98,4 +114,30 @@ function releaseLocks(projectId: string, userId: string) {
   const m = hub.locks.get(projectId);
   if (!m) return;
   for (const [k, v] of m) if (v.userId === userId) m.delete(k);
+}
+
+const DRAFT_TTL = 6 * 60 * 60_000;
+
+function draftsFor(projectId: string) {
+  hub.drafts ??= new Map(); // the hub can predate this field after a dev hot reload
+  if (!hub.drafts.has(projectId)) hub.drafts.set(projectId, new Map());
+  return hub.drafts.get(projectId)!;
+}
+
+export function draftList(projectId: string): Draft[] {
+  const m = draftsFor(projectId);
+  const now = Date.now();
+  for (const [k, d] of m) if (now - d.at > DRAFT_TTL) m.delete(k);
+  return [...m.values()];
+}
+
+export function setDraft(projectId: string, d: Omit<Draft, "at">) {
+  const draft = { ...d, at: Date.now() };
+  draftsFor(projectId).set(d.field, draft);
+  publish(projectId, { type: "draft", draft });
+}
+
+/** Called when the prompt is submitted: everyone's box empties. */
+export function clearDraft(projectId: string, field: DraftField, by: { userId: string; name: string; color: string }) {
+  setDraft(projectId, { field, text: "", ...by, clientId: "" });
 }

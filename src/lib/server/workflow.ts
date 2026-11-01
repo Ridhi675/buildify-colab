@@ -259,7 +259,7 @@ export async function requestPreview(projectId: string, actor: Actor, feedback?:
     if (!approved) throw new HttpError(400, "Approve at least one requirement before generating a preview");
     await tx.approvalRequest.updateMany({ where: { projectId, kind: "preview", status: "pending" }, data: { status: "superseded", resolvedAt: new Date() } });
     await activity(tx, projectId, actor, "Requested preview", { outcome: feedback ? `feedback: ${feedback}` : undefined });
-    return createTask(tx, projectId, "reviewer", "preview", "Generate visual + textual preview", { feedback }, actor.id);
+    return createTask(tx, projectId, "reviewer", "preview", "Generate preview", { feedback }, actor.id);
   });
   startTask(t.id);
   return { taskId: t.id };
@@ -312,13 +312,16 @@ export async function vote(projectId: string, actor: Actor & { role: string }, r
 
 async function onRejected(tx: Tx, projectId: string, kind: string, payload: Record<string, string>, status: string, comment?: string) {
   if (kind === "preview") {
-    const pv = await tx.preview.update({ where: { id: payload.previewId }, data: { status: status === "rejected" ? "rejected" : "changes_requested", feedback: j.str(comment ? [comment] : []) } });
+    const prev = await tx.preview.findUniqueOrThrow({ where: { id: payload.previewId } });
+    // Keep the feedback the preview was generated with; the next regenerate reads all of it.
+    const feedback = [...j.parse<string[]>(prev.feedback, []), ...(comment ? [comment] : [])];
+    const pv = await tx.preview.update({ where: { id: prev.id }, data: { status: status === "rejected" ? "rejected" : "changes_requested", feedback: j.str(feedback) } });
     await notify(tx, projectId, "waiting", `Preview #${pv.number} ${status === "rejected" ? "rejected" : "needs changes"}`, comment ?? "Reviewer can regenerate with feedback.");
   } else if (kind === "change") {
     await tx.impactAnalysis.update({ where: { id: payload.impactId }, data: { status: "rejected" } });
   } else if (kind === "build_output") {
     await tx.agentTask.update({ where: { id: payload.builderTaskId }, data: { phaseLabel: status === "rejected" ? "Output rejected by humans" : "Revision requested" } });
-    await notify(tx, projectId, "waiting", "Builder output not accepted", comment ?? "Use Redirect or Retry in the Agent Control Centre.");
+    await notify(tx, projectId, "waiting", "Builder output not accepted", comment ?? "Use Redirect or Retry in Agents.");
   }
 }
 
@@ -332,7 +335,7 @@ async function onApproved(tx: Tx, projectId: string, kind: string, payload: Reco
     const pv = await tx.preview.update({ where: { id: payload.previewId }, data: { status: "approved" } });
     const artifact = (await tx.artifact.findFirst({ where: { projectId } })) ?? (await tx.artifact.create({ data: { projectId, name: p.name } }));
     const decision = await tx.decision.create({
-      data: { projectId, title: `Preview #${pv.number} approved`, summary: "Visual and textual preview accepted as the build target", reason: "Preview-first gate passed", kind: "preview", proposedById: reviewer.id, approvedByIds: j.str(approvers), contextVersion: p.contextVersion, agentContributions: j.str(["Bunty generated the preview"]) },
+      data: { projectId, title: `Preview #${pv.number} approved`, summary: "Preview accepted as the build target", reason: "Preview-first gate passed", kind: "preview", proposedById: reviewer.id, approvedByIds: j.str(approvers), contextVersion: p.contextVersion, agentContributions: j.str(["Bunty generated the preview"]) },
     });
     const av = await createArtifactVersion(tx, projectId, artifact.id, `Approved preview #${pv.number}`, pv.spec, actor.id, decision.id, null, ["initial version"]);
     await tx.project.update({ where: { id: projectId }, data: { currentArtifactVerId: av.id, phase: "build" } });

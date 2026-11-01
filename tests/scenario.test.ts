@@ -187,3 +187,36 @@ describe("CareConnect demo scenario", () => {
     expect(s.metrics.quarantined).toBe(2);
   });
 });
+
+describe("preview feedback changes the theme end to end", () => {
+  beforeAll(async () => {
+    await resetDemo();
+  });
+
+  it("regenerating with 'dark to light' gives a light preview, build and passing validation", async () => {
+    await wf.submitRequest(P, aisha, "Build a healthcare appointment booking app with a dark theme, desktop-first.");
+    await settle();
+    const keys = (await db.requirement.findMany({ where: { projectId: P, status: "proposed" } })).map((r) => r.key);
+    await wf.decideProposed(P, daniel, keys, "approve");
+    await wf.requestPreview(P, aisha);
+    await settle();
+    const first = await db.preview.findFirstOrThrow({ where: { projectId: P }, orderBy: { number: "desc" } });
+    expect(JSON.parse(first.spec).theme.mode).toBe("dark");
+
+    await wf.requestPreview(P, aisha, "change theme from dark to light");
+    await settle();
+    const second = await db.preview.findFirstOrThrow({ where: { projectId: P }, orderBy: { number: "desc" } });
+    expect(second.number).toBe(first.number + 1);
+    expect(JSON.parse(second.spec).theme.mode).toBe("light");
+    expect(JSON.parse(second.feedback)).toEqual(["change theme from dark to light"]);
+
+    const ar = await db.approvalRequest.findFirstOrThrow({ where: { projectId: P, kind: "preview", status: "pending", payload: { contains: second.id } } });
+    await wf.vote(P, { ...aisha, role: "founder" }, ar.id, "approve");
+    await wf.vote(P, { ...daniel, role: "designer" }, ar.id, "approve");
+    await settle();
+    const build = await db.agentTask.findFirstOrThrow({ where: { projectId: P, type: "build" }, orderBy: { createdAt: "desc" } });
+    expect(JSON.parse(build.output!).result.spec.theme.mode).toBe("light");
+    const validate = await db.agentTask.findFirstOrThrow({ where: { projectId: P, type: "validate" }, orderBy: { createdAt: "desc" } });
+    expect(JSON.parse(validate.output!).result.passed).toBe(true);
+  });
+});

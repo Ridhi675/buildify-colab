@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { CATEGORIES, PRIORITIES } from "../types";
 import type { Actor } from "./core";
-import { acquireLock, publish, releaseLock, touchPresence } from "./realtime";
+import { acquireLock, clearDraft, DRAFT_FIELDS, publish, releaseLock, setDraft, touchPresence } from "./realtime";
 import { controlTask, delegateTask, redirectTask, restartAgent } from "./tasks";
 import * as wf from "./workflow";
 import { resetDemo, DEMO_ID } from "./seed";
@@ -38,6 +38,7 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("presence"), view: z.string().max(40), focus: z.string().max(80).nullable().optional() }),
   z.object({ type: z.literal("cursor"), x: z.number(), y: z.number(), view: z.string().max(40) }),
   z.object({ type: z.literal("lock"), target: id, release: z.boolean().optional() }),
+  z.object({ type: z.literal("draft"), field: z.enum(DRAFT_FIELDS), text: z.string().max(4000), clientId: z.string().max(40) }),
   z.object({ type: z.literal("set_policy"), major: z.number().int().min(1).max(2), minor: z.number().int().min(1).max(2), release: z.number().int().min(1).max(2) }),
   z.object({ type: z.literal("mark_read") }),
   z.object({ type: z.literal("reset_demo") }),
@@ -47,21 +48,31 @@ export const ActionSchema = z.discriminatedUnion("type", [
 export type Action = z.infer<typeof ActionSchema>;
 
 /** Observers (non-technical stakeholders) may read, comment and ask the Reviewer — nothing else. */
-const OBSERVER_OK = new Set(["comment", "chat", "presence", "cursor", "mark_read", "compare", "restore_preview"]);
+const OBSERVER_OK = new Set(["comment", "chat", "draft", "presence", "cursor", "mark_read", "compare", "restore_preview"]);
 
 export async function dispatch(projectId: string, user: { id: string; name: string; color: string }, role: string, a: Action) {
   const actor: Actor = { id: user.id, name: user.name, kind: "human" };
   if (role === "observer" && !OBSERVER_OK.has(a.type)) throw new HttpError(403, "Observers can view, comment and chat, but not change the project");
 
+  const by = { userId: user.id, name: user.name, color: user.color };
+
   switch (a.type) {
-    case "submit_request": return wf.submitRequest(projectId, actor, a.request);
+    case "submit_request": {
+      const r = await wf.submitRequest(projectId, actor, a.request);
+      clearDraft(projectId, "request", by);
+      return r;
+    }
     case "decide_requirements": return wf.decideProposed(projectId, actor, a.keys, a.decision);
     case "edit_proposed": return wf.editProposed(projectId, actor, a.key, a.expectedVersion, { title: a.title, description: a.description, priority: a.priority });
     case "add_requirement": return wf.addRequirement(projectId, actor, a);
     case "propose_change": return wf.proposeChange(projectId, actor, a);
     case "rebase_change": return wf.rebaseChange(projectId, actor, a.impactId);
     case "discard_change": return wf.discardChange(projectId, actor, a.impactId);
-    case "request_preview": return wf.requestPreview(projectId, actor, a.feedback);
+    case "request_preview": {
+      const r = await wf.requestPreview(projectId, actor, a.feedback);
+      clearDraft(projectId, "preview-feedback", by);
+      return r;
+    }
     case "vote": return wf.vote(projectId, { ...actor, role }, a.requestId, a.vote, a.comment);
     case "task_control": return controlTask(projectId, actor, a.taskId, a.op);
     case "task_redirect": return redirectTask(projectId, actor, a.taskId, a.instructions);
@@ -73,7 +84,13 @@ export async function dispatch(projectId: string, user: { id: string; name: stri
     case "compare": return wf.compareVersions(projectId, a.a, a.b);
     case "request_release": return wf.requestRelease(projectId, actor);
     case "comment": return wf.addComment(projectId, actor, a.targetType, a.targetId, a.body);
-    case "chat": return wf.chat(projectId, actor, a.message);
+    case "chat":
+      clearDraft(projectId, "chat", by); // the reply can take a while; the message is already posted
+      return wf.chat(projectId, actor, a.message);
+    case "draft":
+      if (role === "observer" && a.field !== "chat") throw new HttpError(403, "Observers can only draft chat messages");
+      setDraft(projectId, { field: a.field, text: a.text, clientId: a.clientId, ...by });
+      return { ok: true };
     case "presence":
       touchPresence(projectId, { userId: user.id, name: user.name, color: user.color, view: a.view, focus: a.focus ?? null });
       return { ok: true };

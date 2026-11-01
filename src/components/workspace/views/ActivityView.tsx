@@ -13,7 +13,7 @@ export function ActivityView() {
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <Card>
-        <CardHeader icon={<Activity size={16} />} title="Activity" subtitle="Everything that happened — actor, action, affected item, context version and outcome. Ctrl/Cmd+Shift+A opens this view." actions={<Tabs value={who} onChange={setWho} items={[{ value: "all", label: "All" }, { value: "human", label: "Humans" }, { value: "agent", label: "Agents" }, { value: "system", label: "System" }]} />} />
+        <CardHeader icon={<Activity size={16} />} title="History" subtitle="Everything that happened, newest first. Ctrl/Cmd+Shift+A opens this view." actions={<Tabs value={who} onChange={setWho} items={[{ value: "all", label: "All" }, { value: "human", label: "Humans" }, { value: "agent", label: "Agents" }, { value: "system", label: "System" }]} />} />
         <ol className="divide-y divide-slate-100">
           {list.map((a) => {
             const member = state.members.find((m) => m.userId === a.actorId);
@@ -30,7 +30,6 @@ export function ActivityView() {
                   <span className="text-[11px] text-slate-400" title={new Date(a.createdAt).toLocaleString()}>{timeAgo(a.createdAt)}</span>
                   <div className="flex gap-1">
                     {a.simulated && <SimulatedNote>event</SimulatedNote>}
-                    <Badge>ctx v{a.contextVersion}</Badge>
                   </div>
                 </div>
               </li>

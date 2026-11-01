@@ -4,18 +4,16 @@
 
 import { z } from "zod";
 import { structured, type LlmResult } from "./llm";
-import { deriveSpec, deriveTextual, allComponents } from "../engine/spec";
+import { applyDesignFeedback, deriveSpec, allComponents, type DesignOverride } from "../engine/spec";
 import {
   CATEGORIES,
   PRIORITIES,
   SimplifyResultSchema,
-  TextualSpecSchema,
   type AppSpec,
   type ImpactResult,
   type ProposedRequirement,
   type ReqLite,
   type SimplifyResult,
-  type TextualSpec,
 } from "../types";
 
 export interface AiOutput<T> {
@@ -174,8 +172,9 @@ const CopySchema = z.object({
  * Structure and theme always come from the deterministic engine (so impact analysis
  * and partial rebuilds stay reliable); the LLM, when available, writes the copy.
  */
-export async function generateSpec(reqs: ReqLite[], appName: string, onlyKeys?: Set<string>): Promise<AiOutput<AppSpec>> {
-  const skeleton = deriveSpec(reqs, appName);
+export async function generateSpec(reqs: ReqLite[], appName: string, onlyKeys?: Set<string>, feedback: string[] = []): Promise<AiOutput<AppSpec>> {
+  const derived = deriveSpec(reqs, appName);
+  const skeleton = { ...derived, theme: applyDesignFeedback(derived.theme, feedback).theme };
   const targets = allComponents(skeleton).filter((c) => !onlyKeys || onlyKeys.has(c.key));
   const out = await withFallback(
     () =>
@@ -184,7 +183,9 @@ export async function generateSpec(reqs: ReqLite[], appName: string, onlyKeys?: 
         schema: CopySchema,
         prompt:
           `Approved requirements:\n${JSON.stringify(reqs.filter((r) => r.status === "approved").map(({ key, title, description }) => ({ key, title, description })))}\n` +
-          `Theme: ${JSON.stringify(skeleton.theme)}\nComponents to write (keep keys, ≤6 items each):\n${JSON.stringify(targets.map(({ key, type, title, body, items }) => ({ key, type, title, body, items })))}`,
+          `Theme: ${JSON.stringify(skeleton.theme)}\n` +
+          (feedback.length ? `Human feedback on earlier previews (oldest first, follow the latest): ${JSON.stringify(feedback)}\n` : "") +
+          `Components to write (keep keys, ≤6 items each):\n${JSON.stringify(targets.map(({ key, type, title, body, items }) => ({ key, type, title, body, items })))}`,
       }),
     () => ({ tagline: skeleton.tagline, components: targets.map(({ key, title, body, items }) => ({ key, title, body, items })) }),
   );
@@ -203,18 +204,6 @@ export async function generateSpec(reqs: ReqLite[], appName: string, onlyKeys?: 
   return { ...out, data: spec };
 }
 
-export async function generateTextual(reqs: ReqLite[], spec: AppSpec): Promise<AiOutput<TextualSpec>> {
-  return withFallback(
-    () =>
-      structured({
-        system: REVIEWER_SYSTEM,
-        schema: TextualSpecSchema,
-        prompt: `Write the textual preview (plain language) for this product.\nRequirements: ${JSON.stringify(reqs.filter((r) => r.status === "approved").map(({ key, title, description }) => ({ key, title, description })))}\nScreens: ${JSON.stringify(spec.pages.map((p) => ({ name: p.name, purpose: p.purpose, components: p.components.map((c) => c.title) })))}`,
-      }),
-    () => deriveTextual(reqs, spec),
-  );
-}
-
 // ---------------- Validation (Reviewer checks Builder output) ----------------
 
 export interface Validation {
@@ -223,7 +212,7 @@ export interface Validation {
   summary: string;
 }
 
-export function validateSpec(spec: AppSpec, reqs: ReqLite[]): Validation {
+export function validateSpec(spec: AppSpec, reqs: ReqLite[], overrides: DesignOverride[] = []): Validation {
   const approved = reqs.filter((r) => r.status === "approved");
   const t = approved.map((r) => `${r.title} ${r.description}`.toLowerCase()).join(" ");
   const checks: Validation["checks"] = [];
@@ -234,8 +223,10 @@ export function validateSpec(spec: AppSpec, reqs: ReqLite[]): Validation {
     checks.push({ label: "Reduced motion", ok: spec.theme.motion === "reduced", requirementKey: req(/elderly|senior/) });
   }
   if (/mobile-first|mobile first|mobile/.test(t)) checks.push({ label: "Mobile-first layout", ok: spec.theme.layout === "mobile-first", requirementKey: req(/mobile/) });
-  if (/dark theme|dark visual/.test(t) && !/elderly/.test(t)) checks.push({ label: "Dark theme applied", ok: spec.theme.mode === "dark", requirementKey: req(/dark/) });
-  if (/light theme|light visual/.test(t)) checks.push({ label: "Light theme applied", ok: spec.theme.mode === "light", requirementKey: req(/light/) });
+  // Humans changed the theme mode through preview feedback, so it no longer has to match the requirement text.
+  if (overrides.includes("mode")) checks.push({ label: `${spec.theme.mode === "dark" ? "Dark" : "Light"} theme applied (set by approved preview feedback)`, ok: true });
+  else if (/dark theme|dark visual/.test(t) && !/elderly/.test(t)) checks.push({ label: "Dark theme applied", ok: spec.theme.mode === "dark", requirementKey: req(/dark/) });
+  if (!overrides.includes("mode") && /light theme|light visual/.test(t)) checks.push({ label: "Light theme applied", ok: spec.theme.mode === "light", requirementKey: req(/light/) });
   if (spec.navigation.items.length > 0) checks.push({ label: `Navigation has ≤ 5 destinations (${spec.navigation.items.length})`, ok: spec.navigation.items.length <= 5 });
   const comps = allComponents(spec);
   for (const r of approved.filter((r) => r.category === "feature")) {

@@ -1,10 +1,10 @@
 "use client";
 
-import { AlertTriangle, Bot, CheckCircle2, MessageSquare, RotateCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import type { Cursor, Lock, Presence, State } from "../client";
+import { AlertTriangle, Bot, CheckCircle2, Download, ExternalLink, MessageSquare, RotateCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import type { Cursor, Draft, Lock, Presence, State } from "../client";
 import { agentColor } from "../effects";
-import { cn, timeAgo } from "../client";
+import { cn, getToken, timeAgo } from "../client";
 import { Avatar, Badge, Button, inputCls, SourceBadge, StatusBadge } from "../ui";
 
 export interface Ctx {
@@ -14,6 +14,9 @@ export interface Ctx {
   presence: Presence[];
   locks: Lock[];
   cursors: Record<string, Cursor>;
+  drafts: Record<string, Draft>;
+  /** Realtime (SSE) connection to the server. */
+  connected: boolean;
   go: (view: string, query?: string) => void;
   view: string;
   toast: (msg: string, tone?: "ok" | "err") => void;
@@ -65,7 +68,6 @@ export function ApprovalCard({ a, compact }: { a: State["approvals"][number]; co
       </div>
       {!compact && <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{a.summary}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-        <Badge>context v{a.contextVersion}</Badge>
         {stale && <Badge tone="amber" title="Context changed after this request was created">context moved on</Badge>}
         <span>{approvals}/{a.requiredApprovals} human approvals</span>
         <span className="flex -space-x-1">
@@ -100,7 +102,7 @@ export function ApprovalCard({ a, compact }: { a: State["approvals"][number]; co
             {a.kind === "change" && payload.impactId && (
               <Button size="sm" variant="ghost" onClick={() => go("ripple", `impact=${payload.impactId}`)}>Ripple effect →</Button>
             )}
-            {a.kind === "preview" && <Button size="sm" variant="ghost" onClick={() => go("preview")}>Open preview →</Button>}
+            {a.kind === "preview" && <Button size="sm" variant="ghost" onClick={() => go("workspace")}>Open preview →</Button>}
           </div>
           {mine && <div className="text-[11px] text-slate-500">You voted “{mine.vote}”. Waiting for the other human.</div>}
         </div>
@@ -112,7 +114,7 @@ export function ApprovalCard({ a, compact }: { a: State["approvals"][number]; co
 export function ChatPanel() {
   const { state, run } = useWs();
   const name = useNames();
-  const [msg, setMsg] = useState("");
+  const { text: msg, setText: setMsg, typing, lastEditor } = useLiveDraft("chat");
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -139,6 +141,7 @@ export function ChatPanel() {
         })}
         <div ref={end} />
       </div>
+      <DraftStatus typing={typing} lastEditor={lastEditor} className="px-3 pt-1.5" />
       <form
         className="flex gap-1.5 border-t border-slate-100 p-2"
         onSubmit={async (e) => {
@@ -224,4 +227,90 @@ export function SimulatedNote({ children }: { children: React.ReactNode }) {
 
 export function Done({ children }: { children: React.ReactNode }) {
   return <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 size={13} />{children}</span>;
+}
+
+/** Open or download the artifact as a standalone website (one HTML file that runs anywhere). */
+export function SiteButtons({ query }: { query: string }) {
+  const { state } = useWs();
+  const href = (download: boolean) =>
+    `/api/projects/${state.project.id}/site?${query}${download ? "&download=1" : ""}&t=${encodeURIComponent(getToken() ?? "")}`;
+  return (
+    <>
+      <Button size="sm" title="Open the generated website in a new tab" onClick={() => void window.open(href(false), "_blank", "noopener")}>
+        <ExternalLink size={13} /> Open website
+      </Button>
+      <Button size="sm" title="Download a single HTML file you can host on Netlify, GitHub Pages or any static host" onClick={() => window.location.assign(href(true))}>
+        <Download size={13} /> Download
+      </Button>
+    </>
+  );
+}
+
+// ---------- Live prompting ----------
+
+const tabId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID().slice(0, 12) : Math.random().toString(36).slice(2, 14);
+
+/**
+ * A prompt box shared by everyone in the project: keystrokes stream to the
+ * others (throttled) and their typing appears here. Last write wins; while
+ * you are typing, incoming text waits so it never eats your keystrokes.
+ */
+export function useLiveDraft(field: Draft["field"]) {
+  const { drafts, act, state } = useWs();
+  const remote = drafts[field];
+  const [text, setLocal] = useState(remote?.text ?? "");
+  const lastLocal = useRef(0);
+  const seen = useRef(remote?.at ?? 0);
+  const pending = useRef<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, tick] = useState(0);
+
+  useEffect(() => {
+    if (!remote || remote.at <= seen.current) return;
+    seen.current = remote.at;
+    if (remote.clientId === tabId) return; // our own echo
+    if (remote.text !== "" && Date.now() - lastLocal.current < 800) return; // we're mid-typing; our next send wins
+    setLocal(remote.text);
+  }, [remote]);
+
+  const flush = useCallback(() => {
+    timer.current = null;
+    if (pending.current === null) return;
+    const t = pending.current;
+    pending.current = null;
+    void act({ type: "draft", field, text: t, clientId: tabId }).catch(() => {});
+  }, [act, field]);
+
+  const setText = useCallback(
+    (v: string) => {
+      setLocal(v);
+      lastLocal.current = Date.now();
+      pending.current = v;
+      timer.current ??= setTimeout(flush, 150);
+    },
+    [flush],
+  );
+
+  // Re-render while someone else is typing so the indicator fades out on its own.
+  const typing = remote && remote.clientId !== tabId && remote.clientId !== "" && Date.now() - remote.at < 2500 ? remote : null;
+  useEffect(() => {
+    if (!typing) return;
+    const t = setTimeout(() => tick((n) => n + 1), Math.max(100, 2600 - (Date.now() - typing.at)));
+    return () => clearTimeout(t);
+  }, [typing]);
+
+  const lastEditor = remote && remote.text && remote.userId !== state.me.id && text === remote.text ? remote : null;
+  return { text, setText, typing, lastEditor };
+}
+
+/** "Daniel is typing…" / "Shared draft · last edited by Daniel" next to a live prompt box. */
+export function DraftStatus({ typing, lastEditor, className }: { typing: Draft | null; lastEditor: Draft | null; className?: string }) {
+  const who = typing ?? lastEditor;
+  if (!who) return null;
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-[11px] text-slate-500", className)} aria-live="polite">
+      <span className={cn("h-2 w-2 rounded-full", typing && "animate-pulse-soft")} style={{ background: who.color }} />
+      {typing ? `${who.name.split(" ")[0]} is typing…` : `Shared draft · last edited by ${who.name.split(" ")[0]}`}
+    </span>
+  );
 }

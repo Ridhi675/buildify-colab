@@ -3,7 +3,7 @@
 // (b) to simulate a requirement change for deterministic impact analysis, and
 // (c) to keep unaffected components byte-identical during impact-aware rebuilds.
 
-import type { AppSpec, ReqLite, SpecComponent, SpecPage, TextualSpec, Theme } from "../types";
+import type { AppSpec, ReqLite, SpecComponent, SpecPage, Theme } from "../types";
 
 const text = (reqs: ReqLite[]) =>
   reqs
@@ -32,6 +32,57 @@ export function deriveTheme(reqs: ReqLite[]): Theme {
   };
 }
 
+const COLORS: Record<string, string> = {
+  blue: "#2563eb", indigo: "#4f46e5", purple: "#7c3aed", violet: "#7c3aed", pink: "#db2777", red: "#dc2626",
+  orange: "#ea580c", amber: "#d97706", yellow: "#ca8a04", green: "#16a34a", teal: "#0f766e", cyan: "#0891b2",
+  gray: "#475569", grey: "#475569",
+};
+const COLOR_RE = new RegExp(`\\b(${Object.keys(COLORS).join("|")})\\b`, "g");
+// "dark"/"light" followed by a colour name is a shade ("light blue"), not a theme mode.
+const MODE_RE = new RegExp(`\\b(dark|light|night|black background|white background)\\b(?!\\s+(?:${Object.keys(COLORS).join("|")})\\b)`, "g");
+
+/** Theme fields that preview feedback can override. */
+export type DesignOverride = "mode" | "primary" | "fontScale" | "contrast" | "layout" | "density" | "motion";
+
+/**
+ * Apply plain-language preview feedback ("change the theme from dark to light",
+ * "make it green", "bigger text") on top of the requirement-derived theme.
+ * Feedback is applied oldest → newest, and within one note the last mention wins.
+ */
+export function applyDesignFeedback(theme: Theme, feedback: string[]): { theme: Theme; applied: DesignOverride[] } {
+  const out = { ...theme };
+  const applied = new Set<DesignOverride>();
+  for (const raw of feedback) {
+    const f = raw.toLowerCase();
+    const modes = [...f.matchAll(MODE_RE)].map((m) => m[1]);
+    const lastMode = modes[modes.length - 1];
+    if (lastMode) {
+      out.mode = lastMode === "light" || lastMode === "white background" ? "light" : "dark";
+      applied.add("mode");
+    }
+    const hex = f.match(/#[0-9a-f]{6}\b/);
+    const named = [...f.matchAll(COLOR_RE)].map((m) => m[1]);
+    if (hex || named.length) {
+      out.primary = hex ? hex[0] : COLORS[named[named.length - 1]];
+      applied.add("primary");
+    }
+    if (/\b(bigger|larger|increase|huge)\b[^.]*\b(text|font|type)\b|\b(text|font)\b[^.]*\b(bigger|larger)\b/.test(f)) {
+      out.fontScale = Math.min(1.5, Math.round((out.fontScale + 0.25) * 100) / 100);
+      applied.add("fontScale");
+    } else if (/\b(smaller|decrease|reduce)\b[^.]*\b(text|font|type)\b|\b(text|font)\b[^.]*\bsmaller\b/.test(f)) {
+      out.fontScale = Math.max(1, Math.round((out.fontScale - 0.25) * 100) / 100);
+      applied.add("fontScale");
+    }
+    if (/high contrast/.test(f)) (out.contrast = "high"), applied.add("contrast");
+    if (/\bmobile(-| )?first\b|\bmobile layout\b/.test(f)) (out.layout = "mobile-first"), applied.add("layout");
+    else if (/\bdesktop(-| )?first\b|\bdesktop layout\b/.test(f)) (out.layout = "desktop-first"), applied.add("layout");
+    if (/\b(spacious|more space|roomier|more padding)\b/.test(f)) (out.density = "spacious"), applied.add("density");
+    else if (/\b(compact|denser|less space|tighter)\b/.test(f)) (out.density = "compact"), applied.add("density");
+    if (/\b(reduce[d]? motion|no animation|fewer animations|less animation)\b/.test(f)) (out.motion = "reduced"), applied.add("motion");
+  }
+  return { theme: out, applied: [...applied] };
+}
+
 function reqsFor(reqs: ReqLite[], componentKey: string) {
   return reqs.filter((r) => r.status === "approved" && r.components.includes(componentKey)).map((r) => r.key);
 }
@@ -55,7 +106,7 @@ export function deriveSpec(reqs: ReqLite[], appName: string): AppSpec {
 
   let pages: SpecPage[];
   if (isHealthcare(reqs, appName)) {
-    const btn = elderly ? "Large, labelled buttons (min 56px)" : "Standard buttons";
+    const btn = elderly ? "Just two details. We will call you to confirm." : "We use these details to confirm your visit.";
     pages = [
       {
         key: "home",
@@ -195,22 +246,4 @@ export function diffSpecs(a: AppSpec, b: AppSpec) {
 function fmt(k: string, v: unknown) {
   if (k === "fontScale") return `${Math.round(Number(v) * 100)}%`;
   return String(v);
-}
-
-export function deriveTextual(reqs: ReqLite[], spec: AppSpec): TextualSpec {
-  const approved = reqs.filter((r) => r.status === "approved");
-  const audience = approved.find((r) => r.category === "audience");
-  return {
-    summary: `${spec.appName}: ${spec.tagline}. ${spec.pages.length} screens, ${spec.theme.layout}, ${spec.theme.mode} theme.`,
-    audience: audience ? audience.description : "Not specified yet",
-    features: approved.filter((r) => r.category === "feature").map((r) => r.title),
-    functionalRequirements: approved.map((r) => `${r.key}: ${r.title}`),
-    pages: spec.pages.map((p) => ({ name: p.name, description: `${p.purpose} — ${p.components.map((c) => c.title).join(", ")}` })),
-    assumptions: [
-      "Preview is rendered from structured JSON; no generated code is executed.",
-      `Text size ${Math.round(spec.theme.fontScale * 100)}%, ${spec.theme.contrast} contrast, ${spec.theme.motion} motion.`,
-      "Backend endpoints are described, not deployed, in this MVP.",
-    ],
-    journey: spec.pages.map((p, i) => `${i + 1}. ${p.name}: ${p.purpose}`),
-  };
 }

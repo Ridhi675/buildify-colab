@@ -1,6 +1,6 @@
 // Server-Sent Events: realtime sync + presence for one project.
 import { requireMember } from "@/lib/server/auth";
-import { subscribe, touchPresence, presenceList, lockList, type BusEvent } from "@/lib/server/realtime";
+import { subscribe, touchPresence, presenceList, lockList, draftList, type BusEvent } from "@/lib/server/realtime";
 import { json } from "@/lib/server/http";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +30,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       const unsub = subscribe(id, send);
       touchPresence(id, me, +1);
       send({ type: "presence", presence: presenceList(id), locks: lockList(id) });
+      send({ type: "drafts", drafts: draftList(id) });
       const ping = setInterval(() => touchPresence(id, me, 0), 20_000);
       let done = false;
       cleanup = () => {

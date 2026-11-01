@@ -4,28 +4,31 @@
 
 ## Functional
 - Two identifiable humans + one observer; per-tab signed sessions; project-level authorization on every API call; observers cannot mutate
-- Real-time sync across browser sessions (SSE), presence/online status, which view each person is on, follow mode, live cursors, focus mode
+- Real-time sync across browser sessions (SSE), presence/online status, which view each person is on, follow mode, live cursors
+- Live prompting: the product request box, preview feedback and Bunty chat are shared drafts. Everyone sees the text appear as it is typed, with a "<name> is typing…" indicator, and anyone can continue it; submitting empties the box for all. Last write wins (incoming text waits while you are typing); drafts live in the in-memory hub, so they are lost on server restart
 - Soft edit locks ("Aisha is currently editing REQ-001") + server-side optimistic version checks; conflicting proposals preserved with Rebase / Discard
 - Query simplification: original request shown beside structured requirements (ID, description, priority, author, timestamp, version, acceptance criteria, components, approval status); edit / reject / approve
-- Preview Studio: JSON-driven visual preview (mobile/desktop), textual spec, approve / reject / request changes / comment, regenerate with feedback, compare previews
+- Preview at the bottom of the Workspace: the visual preview (or the latest build once one is newer), Approve / Decline / Propose change; a proposed change regenerates the preview with that note. No textual spec is generated
+- Preview feedback changes the design: plain-language notes ("change theme from dark to light", "make it green", "bigger text", "mobile-first") override the requirement-derived theme for that preview and every later build; validation accepts a theme mode set this way
+- Website export: any preview or artifact version opens as a standalone website (**Open website**) or downloads as one self-contained HTML file (**Download**) that runs in any browser and can be hosted on any static host. Pages, navigation, selections, forms (saved entries) and bookings work; data is stored in the visitor's browser
 - Preview-first gate: Builder full generation starts only after the configured number of human approvals
 - Parallel agent work: Reviewer acceptance plan and Builder build run as concurrent async jobs
-- Agent Control Centre: pause (safe boundary), resume (from persisted phase), stop (late output rejected), redirect, retry (bounded, refreshes context), delegate (eligible task types), inspect (inputs, context version, dependency fingerprint, run logs, output, validation)
+- Agents view: pause (safe boundary), resume (from persisted phase), stop (late output rejected), redirect, retry (bounded, refreshes context), delegate (eligible task types), inspect (inputs, context version, dependency fingerprint, run logs, output, validation)
 - Context versions (immutable snapshots), decision log, context timeline, agent context viewer
 - Stale-work detection: every task stores base context + requirement versions; output is checked before commit and quarantined with a plain-language reason
 - Agent restart & recovery from persistent state (epoch bump discards in-memory work); orphaned "running" tasks after a server restart are detected and made resumable
 - Ripple Effect: requirement graph + component graph traversal + simulated rebuild diff; affected/unaffected components, stale tasks, agents, effort, severity, confidence, plan; approve / reject / modify; dependency graph view
 - Impact-aware rebuild: only affected components regenerate; unaffected components kept byte-identical
 - Checkpoints at all milestones + manual; restore checkpoint or version with preview + confirmation; restore creates new versions and never deletes history
-- Decision Time Machine: versions with their own saved spec + requirements, decision explanations, compare two versions (visual, requirements, decisions, actors, reasons)
+- Checkpoints: versions with their own saved spec + requirements, decision explanations, compare two versions (visual, requirements, decisions, actors, reasons), safe restore
 - Approvals: configurable policy (1 or 2 humans for major/minor/release); Reviewer recommendations are advisory and labelled; AI can never vote
 - Notifications in five categories with grouping; @mentions; activity feed with actor, action, target, context version, outcome; Ctrl/Cmd+Shift+N/M/A
-- Context knowledge graph (React Flow) from persisted relationships; click for details and related activity
-- Cost tracking: preview/build/rebuild counts, rejected previews, LLM vs rules runs, tokens and estimated cost from configurable pricing
+- Swimlane: one lane per person and agent, every recorded step in order (History lists the same events newest first)
+- Bunty chat dock: a button at the bottom right opens a side panel that can be resized by dragging its edge and closed again; width and open state are remembered per browser
 
 ## Partial
 - **LLM integration**: two providers behind one adapter (`LLM_PROVIDER`). **Ollama** (local open-weight models, JSON-schema constrained output validated against the same Zod schema, retries, timeouts) is exercised end to end with `qwen3:8b`: Reviewer simplification in the live UI is labelled "Generated by the configured LLM". **Anthropic** (structured output, refusal fallback) is implemented but not exercised here (no API key). Any LLM failure falls back to the rules engine, labelled "Rules engine".
-- **Builder output** is a structured AppSpec rendered by a safe React renderer — a clickable prototype, not generated source code.
+- **Builder output** is a structured AppSpec. It is shown in the workspace by a safe React renderer and compiled into a standalone static website (one HTML file, escaped content, one fixed script). There is no backend in the exported site: no shared database, accounts or real notifications, and layouts come from fixed templates (healthcare booking, or a generic home + feature-form site).
 - **Realtime** is single-process (in-memory hub). Multiple server instances would need Redis/Postgres pub-sub.
 - **Effort estimates** are a per-category heuristic, labelled as such.
 - **Graphify** is used for the developer code graph only (`graphify update src`); token savings were not measured.
@@ -36,5 +39,5 @@
 
 ## Not implemented
 - Docker sandbox / execution of generated code (intentionally avoided; JSON preview instead)
-- Real authentication (demo identities only), Supabase hookup, Monaco code view, image export of previews
-- Public deployment (no URL claimed)
+- Supabase hookup, Monaco code view, image export of previews
+- Generated framework source code (e.g. a Next.js project) or a generated backend

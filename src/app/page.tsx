@@ -234,7 +234,7 @@ export default function Home() {
 
           <footer className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 border-t border-border px-4 py-10 text-xs text-muted-foreground sm:flex-row">
             <span className="flex items-center gap-2"><Users size={14} /> ReBrix — Rethink. Rebuild. Together.</span>
-            <span>Not affiliated with Buildify.</span>
+            <span>A product by TIET students</span>
           </footer>
         </main>
       </div>

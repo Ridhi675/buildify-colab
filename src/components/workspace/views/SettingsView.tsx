@@ -1,19 +1,28 @@
 "use client";
 
-import { Cpu, Rocket, ShieldCheck, Users } from "lucide-react";
+import { Cpu, Rocket, ShieldCheck, Users, Wifi, WifiOff } from "lucide-react";
 import { useState } from "react";
 import { agentColor } from "../../effects";
 import { Avatar, Badge, Button, Card, CardHeader, Field, inputCls } from "../../ui";
 import { ApprovalCard, useWs } from "../shared";
 
 export function SettingsView() {
-  const { state, run } = useWs();
+  const { state, run, connected } = useWs();
   const [pol, setPol] = useState(state.project.policy);
   const ai = state.ai;
   const release = state.approvals.find((a) => a.kind === "release");
   const readOnly = state.me.role === "observer";
   return (
     <div className="mx-auto max-w-5xl space-y-5">
+      <Card>
+        <CardHeader
+          icon={connected ? <Wifi size={16} /> : <WifiOff size={16} />}
+          title="Connection"
+          subtitle={connected ? "Live updates, cursors and shared prompts are connected to the server." : "Reconnecting to the server… changes will sync when the connection is back."}
+          actions={<Badge tone={connected ? "emerald" : "amber"}>{connected ? "Connected" : "Reconnecting"}</Badge>}
+        />
+      </Card>
+
       <Card>
         <CardHeader icon={<Users size={16} />} title="Participants" />
         <div className="grid gap-3 p-4 sm:grid-cols-2">
@@ -51,7 +60,6 @@ export function SettingsView() {
             <Badge tone={ai.enabled ? "violet" : "slate"}>{ai.enabled ? "LLM enabled" : "LLM not configured"}</Badge>
             <Badge>{ai.provider}</Badge>
             <Badge>{ai.model}</Badge>
-            <Badge>${ai.pricing.inPerMTok}/MTok in · ${ai.pricing.outPerMTok}/MTok out</Badge>
           </div>
           <p className="text-xs text-slate-600">
             {ai.enabled

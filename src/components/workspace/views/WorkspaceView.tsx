@@ -1,35 +1,42 @@
 "use client";
 
-import { ArrowUp, Check, ChevronLeft, ChevronRight, Edit3, FileText, Lock, MessageSquare, Pencil, Plus, Sparkles, Wand2, X } from "lucide-react";
+import { ArrowUp, Check, ChevronLeft, ChevronRight, Edit3, FileText, Lock, Pencil, Plus, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { AppSpec, SpecComponent } from "@/lib/types";
-import { AppRenderer } from "../../AppRenderer";
-import { cn, timeAgo, type State } from "../../client";
+import { cn, type State } from "../../client";
 import { agentColor, onGlowMove, OrbitLogo } from "../../effects";
-import { Avatar, Badge, Button, Card, CardHeader, Empty, Field, inputCls, Modal, SourceBadge, StatusBadge, Tabs } from "../../ui";
-import { Comments, useNames, useWs } from "../shared";
+import { Badge, Button, Card, CardHeader, Empty, Field, inputCls, Modal, StatusBadge } from "../../ui";
+import { ApprovalCard, DraftStatus, useLiveDraft, useNames, useWs } from "../shared";
+import { PreviewSection } from "./PreviewStudio";
 
 type Req = State["requirements"][number];
 
 export function WorkspaceView() {
-  const { state } = useWs();
-  const current = state.versions.find((v) => v.id === state.project.currentArtifactVerId);
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <RequestPanel />
       <RequirementsBoard />
-      {current ? <Canvas spec={current.spec as AppSpec} label={`Shared product · artifact v${current.number}`} changed={current.changedComponents} /> : (
-        <Card className="p-5">
-          <Empty icon={<FileText size={28} />} title="No shared artifact yet">Approve requirements, then generate and approve a preview in Preview Studio. The approved preview becomes artifact v1.</Empty>
-        </Card>
-      )}
+      <Decisions />
+      <PreviewSection />
     </div>
+  );
+}
+
+/** Everything else waiting on a human (changes, rebuilds, build output, release). Hidden when empty. */
+function Decisions() {
+  const { state } = useWs();
+  const pending = state.approvals.filter((a) => a.status === "pending" && a.kind !== "preview");
+  if (!pending.length) return null;
+  return (
+    <section className="space-y-2">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Needs a decision</div>
+      <div className="grid gap-3 md:grid-cols-2">{pending.map((a) => <ApprovalCard key={a.id} a={a} />)}</div>
+    </section>
   );
 }
 
 function RequestPanel() {
   const { state, run } = useWs();
-  const [text, setText] = useState("");
+  const { text, setText, typing, lastEditor } = useLiveDraft("request");
   const simplify = state.tasks.filter((t) => t.type === "simplify");
   const running = simplify.find((t) => t.status === "running" || t.status === "queued");
   const requests = [...new Set(state.requirements.map((r) => r.originalRequest).filter(Boolean))] as string[];
@@ -52,7 +59,7 @@ function RequestPanel() {
         <h2 className="mt-6 text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-4xl">Describe the product</h2>
         <p className="mt-2 max-w-lg text-sm text-muted-foreground">Plain language is fine — Bunty turns it into structured, testable requirements you can edit or reject.</p>
 
-        <div className="glow-card mt-7 w-full rounded-3xl border border-border bg-surface text-left shadow-md" onPointerMove={onGlowMove}>
+        <div className="glow-card mt-7 w-full rounded-3xl border border-border bg-surface text-left shadow-md transition-shadow" style={typing ? { boxShadow: `0 0 0 2px ${typing.color}` } : undefined} onPointerMove={onGlowMove}>
           <textarea
             className="block min-h-[96px] w-full resize-none rounded-t-3xl bg-transparent px-5 pt-5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70 disabled:cursor-not-allowed"
             placeholder="e.g. Build a healthcare app for elderly users. Make it easy to navigate and lightweight."
@@ -65,6 +72,7 @@ function RequestPanel() {
             disabled={readOnly}
           />
           <div className="flex flex-wrap items-center gap-2 px-4 pb-4 pt-2">
+            <DraftStatus typing={typing} lastEditor={lastEditor} />
             {state.project.isDemo && !requests.length && (
               <button
                 type="button"
@@ -109,7 +117,7 @@ function RequirementsBoard() {
       <CardHeader
         icon={<FileText size={16} />}
         title="Requirements"
-        subtitle={`${approved.length} approved · ${proposed.length} awaiting a human decision · context v${state.project.contextVersion}`}
+        subtitle={`${approved.length} approved · ${proposed.length} awaiting a human decision`}
         actions={!readOnly && <Button size="sm" onClick={() => setAdding(true)}><Plus size={13} /> Add</Button>}
       />
       {proposed.length > 0 && (
@@ -367,72 +375,3 @@ function AddRequirement({ open, onClose }: { open: boolean; onClose: () => void 
     </Modal>
   );
 }
-
-export function Canvas({ spec, label, changed = [] }: { spec: AppSpec; label: string; changed?: string[] }) {
-  const { state, locks, run } = useWs();
-  const [device, setDevice] = useState<"auto" | "mobile" | "desktop">("auto");
-  const [sel, setSel] = useState<SpecComponent | null>(null);
-  const counts: Record<string, number> = {};
-  for (const c of state.comments) if (c.targetType === "component") counts[c.targetId] = (counts[c.targetId] ?? 0) + 1;
-  const highlights = [
-    ...changed.filter((k) => k !== "initial version").map((k) => ({ key: k, tone: "changed" as const })),
-    ...locks.filter((l) => l.userId !== state.me.id).map((l) => ({ key: l.target, tone: "editing" as const, label: `${l.name.split(" ")[0]} editing` })),
-    ...(sel ? [{ key: sel.key, tone: "selected" as const }] : []),
-  ];
-  const linked = sel ? state.requirements.filter((r) => r.status === "approved" && (sel.requirementKeys.includes(r.key) || r.components.includes(sel.key))) : [];
-  const comp = sel ? state.components.find((c) => c.key === sel.key) : null;
-  return (
-    <Card>
-      <CardHeader
-        icon={<MessageSquare size={16} />}
-        title={label}
-        subtitle="Click any component to inspect it, see which requirements drive it, and comment. Amber outline = changed in this version."
-        actions={<Tabs value={device} onChange={setDevice} items={[{ value: "auto", label: "Auto" }, { value: "mobile", label: "Mobile" }, { value: "desktop", label: "Desktop" }]} />}
-      />
-      <div className="grid gap-4 p-4 lg:grid-cols-[1fr_280px]">
-        <div className="rounded-xl bg-slate-100 p-4">
-          <AppRenderer spec={spec} device={device} highlights={highlights} commentCounts={counts} onSelect={(c) => { setSel(c); void run({ type: "presence", view: "workspace", focus: c.key }); }} />
-        </div>
-        <div className="space-y-3">
-          {!sel ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-4 text-xs text-slate-500">Select a component in the prototype.</div>
-          ) : (
-            <div className="space-y-3 rounded-xl border border-slate-200 p-3">
-              <div>
-                <div className="font-semibold">{sel.title}</div>
-                <div className="font-mono text-[11px] text-slate-400">{sel.key}{comp ? ` · ${comp.category}` : ""}</div>
-              </div>
-              <div className="text-xs text-slate-600">{comp?.description ?? sel.body}</div>
-              <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase text-slate-500">Driven by</div>
-                {linked.length ? linked.map((r) => <div key={r.key} className="text-xs"><span className="font-mono text-slate-400">{r.key}</span> {r.title}</div>) : <div className="text-xs text-slate-400">No linked requirement</div>}
-              </div>
-              <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase text-slate-500">Comments</div>
-                <Comments targetType="component" targetId={sel.key} />
-              </div>
-            </div>
-          )}
-          <PeopleHere />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function PeopleHere() {
-  const { presence, state } = useWs();
-  const others = presence.filter((p) => p.userId !== state.me.id && p.connections > 0);
-  if (!others.length) return <div className="text-[11px] text-slate-400">Only you are here. Open another tab as the other human to collaborate live.</div>;
-  return (
-    <div className="space-y-1">
-      {others.map((p) => (
-        <div key={p.userId} className="flex items-center gap-2 text-xs text-slate-600">
-          <Avatar name={p.name} color={p.color} size={18} online />
-          <span>{p.name.split(" ")[0]} is on <b>{p.view}</b>{p.focus ? <> · looking at <span className="font-mono">{p.focus}</span></> : null} <span className="text-slate-400">{timeAgo(new Date(p.lastSeen))}</span></span>
-        </div>
-      ))}
-    </div>
-  );
-}
-

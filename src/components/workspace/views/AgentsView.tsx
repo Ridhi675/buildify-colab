@@ -211,7 +211,7 @@ function InspectModal({ task, onClose }: { task: Task | null; onClose: () => voi
         <Section title="Runs & action log">
           {task.runs.map((r) => (
             <div key={r.id} className="mb-2 rounded-lg border border-slate-200 p-2 text-xs">
-              <div className="flex flex-wrap items-center gap-1.5"><b>Attempt {r.attempt}</b> <StatusBadge status={r.status} /> <SourceBadge source={r.source} /> {r.model && <Badge>{r.model}</Badge>} <Badge>ctx v{r.contextVersion}</Badge> {r.tokensIn + r.tokensOut > 0 && <Badge>{r.tokensIn}+{r.tokensOut} tokens · ${r.costUsd.toFixed(4)}</Badge>}</div>
+              <div className="flex flex-wrap items-center gap-1.5"><b>Attempt {r.attempt}</b> <StatusBadge status={r.status} /> <SourceBadge source={r.source} /> {r.model && <Badge>{r.model}</Badge>}</div>
               <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-slate-600">
                 {(r.log as { at: string; line: string }[]).map((l, i) => <li key={i}><span className="text-slate-400">{new Date(l.at).toLocaleTimeString()}</span> {l.line}</li>)}
               </ul>
