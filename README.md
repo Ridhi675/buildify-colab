@@ -1,8 +1,11 @@
-# Buildify CoLab
+# ReBrix — Rethink. Rebuild. Together.
 
 **Two humans. Two AI agents. One shared product. Every decision understood.**
 
-A preview-first, context-aware multiplayer AI workspace for the TechnoTribes / Buildify hackathon ("From Multi-Agent to Multiplayer AI"). A founder and a designer collaborate in real time with a **Reviewer AI** (coordinator) and a **Builder AI** (developer) on one visible product artifact. Requirement changes ripple through a dependency graph, outdated agent work is quarantined, agents recover context after a restart, and every decision is recorded in a navigable time machine.
+A preview-first, context-aware multiplayer AI workspace ("From Multi-Agent to Multiplayer AI"). A founder and a designer collaborate in real time with a **Reviewer AI** (coordinator) and a **Builder AI** (developer) on one visible product artifact. Requirement changes ripple through a dependency graph, outdated agent work is quarantined, agents recover context after a restart, and every decision is recorded in restorable checkpoints.
+
+- **Live demo:** https://rebrix.onrender.com (free hosting: the first visit after a quiet spell can take up to a minute)
+- **Team Day Dreamerss** (TIET): Saanjal Jain, Ridhi, Tanishq Goyal, Arnav Goel
 
 The flagship demo project is **CareConnect — accessible healthcare appointment booking**; the platform itself is domain-independent (create any project from the dashboard).
 
@@ -15,6 +18,8 @@ Requirements: Node.js 20+ (tested on 26), npm. No Docker or Postgres needed loca
 ```bash
 cp .env.example .env
 ```
+
+On Windows Command Prompt use `copy .env.example .env` instead (PowerShell and Git Bash accept `cp`).
 
 ```bash
 npm install
