@@ -125,18 +125,42 @@ function VersionView({ v, restoreMode }: { v: Version; restoreMode: boolean }) {
 }
 
 function Compare({ versions }: { versions: Version[] }) {
-  const { act, toast } = useWs();
+  const { state, act, toast, go } = useWs();
   const name = useNames();
-  const [a, setA] = useState(versions[0]?.id ?? "");
+  const [a, setA] = useState(versions[versions.length - 2]?.id ?? "");
   const [b, setB] = useState(versions[versions.length - 1]?.id ?? "");
   const [diff, setDiff] = useState<Diff | null>(null);
   const va = versions.find((v) => v.id === a);
   const vb = versions.find((v) => v.id === b);
+  // Versions can arrive after this opens (a build gets approved): fill in any empty pick.
+  useEffect(() => {
+    if (versions.length < 2) return;
+    if (!versions.some((v) => v.id === a)) setA(versions[versions.length - 2].id);
+    if (!versions.some((v) => v.id === b)) setB(versions[versions.length - 1].id);
+  }, [versions, a, b]);
   useEffect(() => {
     if (!a || !b || a === b) return setDiff(null);
     act<Diff>({ type: "compare", a, b }).then(setDiff).catch((e) => toast(e.message, "err"));
   }, [a, b, act, toast]);
   const tone = (k: string) => (k === "added" ? "bg-emerald-50 text-emerald-900" : k === "removed" ? "bg-rose-50 text-rose-900" : "bg-amber-50 text-amber-900");
+
+  if (versions.length < 2)
+    return (
+      <Card>
+        <CardHeader icon={<GitCompare size={16} />} title="Compare versions" />
+        <div className="p-5">
+          <Empty icon={<GitCompare size={28} />} title={versions.length ? "Only one version so far" : "No versions to compare yet"}>
+            A version is saved each time a build is approved, and you need two to compare. {versions.length ? "You have v1." : "This project has none yet."}
+            {state.previews.length > 1 && (
+              <span className="mt-3 block">
+                <Button size="sm" variant="primary" onClick={() => go("workspace")}><GitCompare size={13} /> Compare your {state.previews.length} previews instead</Button>
+              </span>
+            )}
+          </Empty>
+        </div>
+      </Card>
+    );
+
   return (
     <Card>
       <CardHeader icon={<GitCompare size={16} />} title="Compare versions" actions={
