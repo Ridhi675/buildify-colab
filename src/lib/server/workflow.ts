@@ -21,6 +21,8 @@ import {
 } from "./core";
 import { createTask, proposeRebuild, startTask } from "./tasks";
 import { HttpError } from "./auth";
+import { isTemplate, TEMPLATES, type TemplateKey } from "../engine/templates";
+import { addCatalogue } from "./seed";
 
 // ---------------------------------------------------------------------------
 // Requirements
@@ -125,6 +127,7 @@ export async function proposeChange(
     ]);
     const result = analyzeImpact({
       appName: p.name,
+      template: isTemplate(p.template) ? p.template : "auto",
       changedKey: args.key,
       newTitle: args.title,
       newDescription: args.description,
@@ -575,6 +578,16 @@ export async function setPolicy(projectId: string, actor: Actor, pol: { major: n
   return mutate(projectId, "policy", async (tx) => {
     await tx.project.update({ where: { id: projectId }, data: { approvalPolicy: j.str(pol) } });
     await activity(tx, projectId, actor, "Changed approval policy", { outcome: `major ${pol.major}, minor ${pol.minor}, release ${pol.release}` });
+  });
+}
+
+/** Switch the website template; it applies from the next preview. */
+export async function setTemplate(projectId: string, actor: Actor, template: TemplateKey) {
+  return mutate(projectId, "template", async (tx) => {
+    await tx.project.update({ where: { id: projectId }, data: { template } });
+    await addCatalogue(tx, projectId, template);
+    await activity(tx, projectId, actor, "Changed template", { outcome: TEMPLATES[template].name });
+    await notify(tx, projectId, "context", `Template: ${TEMPLATES[template].name}`, `${actor.name} switched the template. Regenerate the preview to see it.`);
   });
 }
 

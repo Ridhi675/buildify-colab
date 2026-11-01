@@ -9,6 +9,7 @@
 
 import type { CompLite, EdgeLite, ImpactCategory, ImpactResult, ReqLite, TaskLite } from "../types";
 import { allComponents, deriveSpec, diffSpecs } from "./spec";
+import type { TemplateKey } from "./templates";
 
 const EFFORT_HOURS: Record<string, number> = { frontend: 2, design: 1.5, testing: 1, backend: 3 };
 
@@ -30,6 +31,7 @@ export function dependents(start: string[], edges: EdgeLite[]): Map<string, stri
 
 export interface ImpactInput {
   appName: string;
+  template?: TemplateKey;
   changedKey: string;
   newTitle: string;
   newDescription: string;
@@ -64,8 +66,8 @@ export function analyzeImpact(input: ImpactInput): ImpactResult {
   const proposed = requirements.map((r) =>
     r.key === changedKey ? { ...r, title: input.newTitle, description: input.newDescription, version: r.version + 1 } : r,
   );
-  const before = deriveSpec(requirements, input.appName);
-  const after = deriveSpec(proposed, input.appName);
+  const before = deriveSpec(requirements, input.appName, input.template);
+  const after = deriveSpec(proposed, input.appName, input.template);
   const specDiff = diffSpecs(before, after);
   const beforeComps = new Map(allComponents(before).map((c) => [c.key, c]));
   for (const c of allComponents(after)) {

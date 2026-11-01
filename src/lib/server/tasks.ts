@@ -6,6 +6,7 @@
 import { db, j, type Tx } from "../db";
 import { checkStale, fingerprint, type Fingerprint } from "../engine/context";
 import { applyDesignFeedback, deriveTheme, rebuildSpec } from "../engine/spec";
+import { isTemplate, type TemplateKey } from "../engine/templates";
 import * as ai from "../ai/agents";
 import type { AppSpec, ImpactResult, SimplifyResult } from "../types";
 import {
@@ -165,7 +166,7 @@ export async function runTask(taskId: string) {
       changed(projectId, "task phase");
 
       if (i === WORK_PHASE[task0.type]) {
-        const out = await withTimeout(doWork(task0, project.name), workTimeout());
+        const out = await withTimeout(doWork(task0, project.name, isTemplate(project.template) ? project.template : "auto"), workTimeout());
         scratch = { ...scratch, ...out.scratch };
         await db.agentRun.update({
           where: { id: run.id },
@@ -252,7 +253,7 @@ async function designFeedback(projectId: string, extra?: unknown): Promise<strin
   return typeof extra === "string" && extra.trim() ? [...all, extra.trim()] : all;
 }
 
-async function doWork(task: TaskRow, appName: string): Promise<WorkOut> {
+async function doWork(task: TaskRow, appName: string, template: TemplateKey): Promise<WorkOut> {
   const input = j.parse<Record<string, unknown>>(task.input, {});
   // Agents work from the context version they were started with — not the live state.
   const reqs = await reqsAtContext(db, task.projectId, task.baseContextVersion);
@@ -274,7 +275,7 @@ async function doWork(task: TaskRow, appName: string): Promise<WorkOut> {
       return pack(o, { result: o.data, source: o.source });
     }
     case "preview": {
-      const spec = await ai.generateSpec(reqs, appName, undefined, await designFeedback(task.projectId, input.feedback));
+      const spec = await ai.generateSpec(reqs, appName, undefined, await designFeedback(task.projectId, input.feedback), template);
       return pack(spec, { result: { spec: spec.data }, source: spec.source });
     }
     case "build": {
@@ -282,7 +283,7 @@ async function doWork(task: TaskRow, appName: string): Promise<WorkOut> {
       const base = input.baseArtifactVersionId
         ? await db.artifactVersion.findUnique({ where: { id: String(input.baseArtifactVersionId) } })
         : null;
-      const o = await ai.generateSpec(reqs, appName, affected, await designFeedback(task.projectId));
+      const o = await ai.generateSpec(reqs, appName, affected, await designFeedback(task.projectId), template);
       let spec = o.data;
       let changedKeys: string[] = [];
       if (base) {

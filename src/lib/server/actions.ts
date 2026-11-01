@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { CATEGORIES, PRIORITIES } from "../types";
+import { TEMPLATE_KEYS } from "../engine/templates";
 import type { Actor } from "./core";
 import { acquireLock, clearDraft, DRAFT_FIELDS, publish, releaseLock, setDraft, touchPresence } from "./realtime";
 import { controlTask, delegateTask, redirectTask, restartAgent } from "./tasks";
@@ -40,6 +41,7 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("cursor"), x: z.number(), y: z.number(), view: z.string().max(40) }),
   z.object({ type: z.literal("lock"), target: id, release: z.boolean().optional() }),
   z.object({ type: z.literal("draft"), field: z.enum(DRAFT_FIELDS), text: z.string().max(4000), clientId: z.string().max(40) }),
+  z.object({ type: z.literal("set_template"), template: z.enum(TEMPLATE_KEYS) }),
   z.object({ type: z.literal("set_policy"), major: z.number().int().min(1).max(2), minor: z.number().int().min(1).max(2), release: z.number().int().min(1).max(2) }),
   z.object({ type: z.literal("mark_read") }),
   z.object({ type: z.literal("reset_demo") }),
@@ -67,7 +69,7 @@ export async function dispatch(projectId: string, user: { id: string; name: stri
     }
     case "decide_requirements": return wf.decideProposed(projectId, actor, a.keys, a.decision);
     case "edit_proposed": return wf.editProposed(projectId, actor, a.key, a.expectedVersion, { title: a.title, description: a.description, priority: a.priority });
-    case "add_requirement": return wf.addRequirement(projectId, actor, a);
+    case "add_requirement": return wf.addRequirement(projectId, actor, { title: a.title, description: a.description, category: a.category, priority: a.priority });
     case "propose_change": return wf.proposeChange(projectId, actor, a);
     case "rebase_change": return wf.rebaseChange(projectId, actor, a.impactId);
     case "discard_change": return wf.discardChange(projectId, actor, a.impactId);
@@ -106,6 +108,7 @@ export async function dispatch(projectId: string, user: { id: string; name: stri
         return { ok: true };
       }
       return acquireLock(projectId, a.target, user.id, user.name);
+    case "set_template": return wf.setTemplate(projectId, actor, a.template);
     case "set_policy": return wf.setPolicy(projectId, actor, a);
     case "mark_read":
       await wf.markRead(projectId, user.id);

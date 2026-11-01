@@ -48,6 +48,7 @@ export async function getState(projectId: string) {
       contextVersion: p.contextVersion,
       currentArtifactVerId: p.currentArtifactVerId,
       phase: p.phase,
+      template: p.template,
       policy: { ...POLICY_DEFAULT, ...j.parse(p.approvalPolicy, {}) },
     },
     members: p.members.map((m) => ({ userId: m.userId, role: m.role, name: m.user.name, title: m.user.title, color: m.user.color })),

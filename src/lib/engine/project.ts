@@ -162,10 +162,37 @@ if (require.main === module) {
 module.exports = server;
 `;
 
+const NOTICES = `# Third-party notices
+
+Section layouts are adapted from Start Bootstrap's free templates
+(Landing Page, Shop Homepage, Business Casual, Agency, Freelancer, https://startbootstrap.com),
+released under the MIT License:
+
+Copyright (c) 2013-2023 Start Bootstrap LLC
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+`;
+
 function readme(spec: AppSpec, reqs: ReqLite[], label: string) {
   const name = md(spec.appName);
   const approved = reqs.filter((r) => r.status === "approved");
-  const forms = spec.pages.flatMap((p) => p.components.filter((c) => c.type === "form").map((c) => ({ page: p.name, c })));
+  const forms = spec.pages.flatMap((p) => p.components.filter((c) => ["form", "contact", "checkout"].includes(c.type)).map((c) => ({ page: p.name, c })));
   const booking = spec.pages.some((p) => p.components.some((c) => c.type === "booking-form"));
   return `# ${name}
 
@@ -212,6 +239,7 @@ ${slug(spec.appName)}/
 │   └── app.js         routing, forms and calls to the API
 ├── data/              created on first save (db.json)
 ├── spec.json          the ReBrix spec this app was generated from
+├── THIRD_PARTY_NOTICES.md  credits for the layouts (Start Bootstrap, MIT)
 └── README.md
 \`\`\`
 
@@ -289,5 +317,6 @@ ${p.body}
     { path: "public/app.js", content: API_RUNTIME },
     { path: "spec.json", content: JSON.stringify(spec, null, 2) + "\n" },
     { path: ".gitignore", content: "node_modules/\ndata/\n" },
+    { path: "THIRD_PARTY_NOTICES.md", content: NOTICES },
   ];
 }

@@ -62,7 +62,7 @@ function RequestPanel() {
 
         <div className="glow-card mt-7 w-full rounded-3xl border border-border bg-surface text-left shadow-md transition-shadow" style={typing ? { boxShadow: `0 0 0 2px ${typing.color}` } : undefined} onPointerMove={onGlowMove}>
           <textarea
-            className="block min-h-[96px] w-full resize-none rounded-t-3xl bg-transparent px-5 pt-5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70 disabled:cursor-not-allowed"
+            className="block max-h-80 min-h-[96px] w-full resize-none rounded-t-3xl bg-transparent px-5 pt-5 [field-sizing:content] text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70 disabled:cursor-not-allowed"
             placeholder="e.g. Build a healthcare app for elderly users. Make it easy to navigate and lightweight."
             aria-label="Describe the product"
             value={text}

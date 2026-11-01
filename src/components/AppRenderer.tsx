@@ -6,6 +6,7 @@
 import { Bell, Calendar, CheckCircle2, ChevronRight, HelpCircle, Home, Phone, Stethoscope, User } from "lucide-react";
 import { useState } from "react";
 import type { AppSpec, SpecComponent } from "@/lib/types";
+import { initials, pair, plan, product, quote } from "@/lib/engine/items";
 import { cn } from "./client";
 
 export interface Highlight {
@@ -34,6 +35,7 @@ export function AppRenderer({
   const hc = t.contrast === "high";
   const fs = t.fontScale;
   const pad = t.density === "spacious" ? 20 : t.density === "comfortable" ? 16 : 12;
+  const booking = spec.pages.some((p) => p.components.some((x) => x.type === "booking-form"));
   const current = spec.pages[Math.min(page, spec.pages.length - 1)];
 
   const colors = {
@@ -86,7 +88,7 @@ export function AppRenderer({
     <div className={cn("mx-auto overflow-hidden border shadow-xl", mobile ? "w-[390px] max-w-full rounded-[28px]" : "w-full rounded-xl")} style={{ background: colors.bg, color: colors.text, borderColor: dark ? "#1e293b" : "#cbd5e1" }}>
       <div className="flex items-center justify-between" style={{ padding: `${10}px ${pad}px`, background: colors.primary, color: "#fff" }}>
         <div className="flex items-center gap-2 font-semibold" style={{ fontSize: 15 * fs }}>
-          <Stethoscope size={18 * fs} /> {spec.appName}
+          {booking && <Stethoscope size={18 * fs} />} {spec.appName}
         </div>
         {!mobile && <div style={{ fontSize: 12 * fs, opacity: 0.9 }}>{spec.tagline}</div>}
       </div>
@@ -98,12 +100,21 @@ export function AppRenderer({
           </div>
           <div className={cn("grid gap-3", !mobile && current.components.length > 1 && "md:grid-cols-2")}>
             {current.components.map((c) => (
-              <Block key={c.key} c={c} fs={fs} colors={colors} pad={pad} reduced={t.motion === "reduced"} onSelect={onSelect} highlight={hl(c.key)} comments={commentCounts[c.key]} onNext={() => setPage((p) => Math.min(p + 1, spec.pages.length - 1))} />
+              <Block key={c.key} c={c} fs={fs} colors={colors} pad={pad} reduced={t.motion === "reduced"} onSelect={onSelect} highlight={hl(c.key)} comments={commentCounts[c.key]} booking={booking} onNext={() => setPage((p) => Math.min(p + 1, spec.pages.length - 1))} />
             ))}
           </div>
         </main>
       </div>
       {spec.navigation.style === "bottom-tabs" && nav}
+    </div>
+  );
+}
+
+function Field({ label, fs, colors }: { label: string; fs: number; colors: Colors }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12 * fs, color: colors.muted, marginBottom: 2 }}>{label}</div>
+      <div className="rounded-lg" style={{ height: 32 * fs, border: `1.5px solid ${colors.border}`, background: colors.surface }} />
     </div>
   );
 }
@@ -124,7 +135,7 @@ function HighlightTag({ h }: { h: Highlight }) {
 
 type Colors = { bg: string; surface: string; text: string; muted: string; border: string; primary: string };
 
-function Block({ c, fs, colors, pad, reduced, onSelect, highlight, comments, onNext }: { c: SpecComponent; fs: number; colors: Colors; pad: number; reduced: boolean; onSelect?: (c: SpecComponent) => void; highlight?: Highlight; comments?: number; onNext: () => void }) {
+function Block({ c, fs, colors, pad, reduced, onSelect, highlight, comments, booking, onNext }: { c: SpecComponent; fs: number; colors: Colors; pad: number; reduced: boolean; onSelect?: (c: SpecComponent) => void; highlight?: Highlight; comments?: number; booking: boolean; onNext: () => void }) {
   const [picked, setPicked] = useState<number | null>(null);
   const btn = (label: string, primary = true, onClick?: () => void) => (
     <button
@@ -138,7 +149,8 @@ function Block({ c, fs, colors, pad, reduced, onSelect, highlight, comments, onN
       {label}
     </button>
   );
-  const body = <p style={{ fontSize: 13 * fs, color: colors.muted, lineHeight: 1.5 }}>{c.body}</p>;
+  const body = c.body ? <p style={{ fontSize: 13 * fs, color: colors.muted, lineHeight: 1.5 }}>{c.body}</p> : null;
+  const heading = <h3 className="font-semibold" style={{ fontSize: 16 * fs }}>{c.title}</h3>;
 
   let content: React.ReactNode;
   switch (c.type) {
@@ -149,7 +161,7 @@ function Block({ c, fs, colors, pad, reduced, onSelect, highlight, comments, onN
           <h2 className="font-bold" style={{ fontSize: 22 * fs, lineHeight: 1.2 }}>{c.title}</h2>
           {body}
           <div className="flex flex-wrap gap-2">
-            {btn("Book appointment", true, onNext)}
+            {btn(booking ? "Book appointment" : "Get started", true, onNext)}
             {c.items[0] && <span className="flex items-center gap-1" style={{ fontSize: 12 * fs, color: colors.muted }}>{c.items[0].startsWith("Call") ? <Phone size={14 * fs} /> : null}{c.items[0]}</span>}
           </div>
         </div>
@@ -198,7 +210,7 @@ function Block({ c, fs, colors, pad, reduced, onSelect, highlight, comments, onN
               <div className="rounded-lg" style={{ height: 32 * fs, border: `1.5px solid ${colors.border}`, background: colors.surface }} />
             </div>
           ))}
-          <div className="pt-1">{btn("Confirm booking", true, onNext)}</div>
+          <div className="pt-1">{btn(c.type === "booking-form" ? "Confirm booking" : "Save", true, onNext)}</div>
         </div>
       );
       break;
@@ -220,6 +232,140 @@ function Block({ c, fs, colors, pad, reduced, onSelect, highlight, comments, onN
               <input type="checkbox" defaultChecked style={{ width: 16 * fs, height: 16 * fs, accentColor: colors.primary }} /> {r}
             </label>
           ))}
+        </div>
+      );
+      break;
+    // ---- template sections (layouts adapted from Start Bootstrap, MIT) ----
+    case "product-grid":
+      content = (
+        <div className="space-y-2">
+          {heading}
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+            {c.items.map((it, i) => {
+              const p = product(it);
+              return (
+                <div key={i} className="relative space-y-1 rounded-lg p-2 text-center" style={{ border: `1px solid ${colors.border}`, background: colors.bg, fontSize: 12 * fs }}>
+                  {p.sale && <span className="absolute right-3 top-3 rounded-full px-1.5 text-[10px] font-bold" style={{ background: colors.text, color: colors.bg }}>Sale</span>}
+                  <div className="flex aspect-[4/3] items-center justify-center rounded-md text-lg font-extrabold" style={{ background: `${colors.primary}1f`, color: colors.primary }}>{initials(p.name)}</div>
+                  <div className="font-semibold">{p.name}</div>
+                  <div className="font-semibold">{p.sale && <s style={{ color: colors.muted, fontWeight: 400 }}>{p.price}</s>} {p.sale ?? p.price}</div>
+                  {btn("Add to cart", false)}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+      break;
+    case "cart":
+    case "checkout":
+      content = (
+        <div className="space-y-2">
+          {heading}
+          {body}
+          <div className="rounded-lg p-2" style={{ border: `1px dashed ${colors.border}`, fontSize: 12 * fs, color: colors.muted }}>Cart items and total appear here</div>
+          {c.type === "checkout" && c.items.map((f, i) => <Field key={i} label={f} fs={fs} colors={colors} />)}
+          {btn(c.type === "cart" ? "Checkout" : "Place order", true, onNext)}
+        </div>
+      );
+      break;
+    case "menu":
+    case "hours":
+    case "schedule":
+      content = (
+        <div className="space-y-1">
+          {heading}
+          {body}
+          {c.items.map((it, i) => {
+            const p = c.type === "menu" ? product(it) : null;
+            const r = c.type === "hours" ? pair(it, /\s+·\s+/) : pair(it);
+            return (
+              <div key={i} className="flex justify-between gap-3 py-1.5" style={{ borderBottom: `1px dashed ${colors.border}`, fontSize: 13 * fs }}>
+                {p ? (
+                  <>
+                    <span><b>{p.name}</b>{p.note && <span className="block" style={{ color: colors.muted, fontSize: 11 * fs }}>{p.note}</span>}</span>
+                    <b>{p.price}</b>
+                  </>
+                ) : c.type === "schedule" ? (
+                  <span className="flex gap-3"><b style={{ color: colors.primary, minWidth: 48 * fs }}>{r.a}</b>{r.b}</span>
+                ) : (
+                  <>
+                    <span>{r.a}</span>
+                    <b>{r.b}</b>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+      break;
+    case "team":
+    case "testimonials":
+      content = (
+        <div className="space-y-2">
+          {heading}
+          <div className="grid gap-2 text-center" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", fontSize: 12 * fs }}>
+            {c.items.map((it, i) => {
+              const q = c.type === "testimonials" ? quote(it) : null;
+              const r = pair(it);
+              const who = q ? q.who : r.a;
+              return (
+                <div key={i} className="space-y-1 rounded-lg p-2" style={{ border: `1px solid ${colors.border}`, background: colors.bg }}>
+                  <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full font-bold text-white" style={{ background: colors.primary }}>{initials(who || "?")}</div>
+                  {q ? <><p>“{q.text}”</p><div style={{ color: colors.muted }}>{q.who}</div></> : <><b>{r.a}</b><div style={{ color: colors.muted }}>{r.b}</div></>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+      break;
+    case "gallery":
+      content = (
+        <div className="space-y-2">
+          {heading}
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", fontSize: 12 * fs }}>
+            {c.items.map((it, i) => {
+              const r = pair(it);
+              return (
+                <div key={i} className="overflow-hidden rounded-lg" style={{ border: `1px solid ${colors.border}`, background: colors.bg }}>
+                  <div className="aspect-[4/3]" style={{ background: `linear-gradient(${45 + i * 40}deg, ${colors.primary}, ${colors.primary}55)` }} />
+                  <div className="p-1.5"><b className="block">{r.a}</b><span style={{ color: colors.muted }}>{r.b}</span></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+      break;
+    case "pricing":
+      content = (
+        <div className="space-y-2">
+          {heading}
+          {body}
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", fontSize: 12 * fs }}>
+            {c.items.map((it, i) => {
+              const p = plan(it);
+              return (
+                <div key={i} className="space-y-1 rounded-lg p-2" style={{ border: `${i === 1 ? 2 : 1}px solid ${i === 1 ? colors.primary : colors.border}`, background: colors.bg }}>
+                  <b>{p.name}</b>
+                  <div className="text-lg font-extrabold">{p.price}</div>
+                  <ul className="list-disc pl-4" style={{ color: colors.muted }}>{p.features.map((f, j) => <li key={j}>{f}</li>)}</ul>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+      break;
+    case "contact":
+      content = (
+        <div className="space-y-2">
+          {heading}
+          {body}
+          {c.items.map((f, i) => <Field key={i} label={f} fs={fs} colors={colors} />)}
+          <div className="pt-1">{btn("Send", true)}</div>
         </div>
       );
       break;

@@ -19,6 +19,18 @@ export const COMPONENT_TYPES = [
   "stats",
   "text",
   "cta",
+  // Template sections (layouts adapted from Start Bootstrap's MIT templates)
+  "product-grid",
+  "cart",
+  "checkout",
+  "menu",
+  "hours",
+  "schedule",
+  "team",
+  "gallery",
+  "pricing",
+  "testimonials",
+  "contact",
 ] as const;
 
 export const ThemeSchema = z.object({

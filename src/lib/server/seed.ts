@@ -1,6 +1,7 @@
 // Users, the resettable CareConnect demo project, and new-project creation.
 
 import { db, type Tx } from "../db";
+import { templateCatalogue, type TemplateKey } from "../engine/templates";
 
 export const USERS = [
   { id: "u_aisha", name: "Aisha Rao", title: "Founder / Product Manager", color: "#e11d48", role: "founder" },
@@ -81,15 +82,29 @@ export async function resetDemo() {
   return DEMO_ID;
 }
 
-export async function createProject(ownerId: string, name: string, description: string, healthcareComponents: boolean) {
+/** Add a template's components and dependencies that the project doesn't have yet (Ripple uses them). */
+export async function addCatalogue(tx: Tx, projectId: string, template: TemplateKey) {
+  if (template === "auto" || template === "booking") return;
+  const { components, deps } = templateCatalogue(template);
+  const have = new Set((await tx.component.findMany({ where: { projectId }, select: { key: true } })).map((c) => c.key));
+  const fresh = components.filter(([key]) => !have.has(key));
+  if (fresh.length) await tx.component.createMany({ data: fresh.map(([key, name, category]) => ({ projectId, key, name, category })) });
+  const haveDeps = new Set((await tx.componentDependency.findMany({ where: { projectId } })).map((d) => `${d.fromKey}>${d.toKey}`));
+  const newDeps = deps.filter(([a, b]) => !haveDeps.has(`${a}>${b}`));
+  if (newDeps.length) await tx.componentDependency.createMany({ data: newDeps.map(([fromKey, toKey]) => ({ projectId, fromKey, toKey })) });
+}
+
+export async function createProject(ownerId: string, name: string, description: string, healthcare: boolean, template: TemplateKey = "auto") {
   await ensureUsers();
+  const healthcareComponents = healthcare || template === "booking";
   return db.$transaction(async (tx) => {
-    const p = await tx.project.create({ data: { name, description, ownerId } });
+    const p = await tx.project.create({ data: { name, description, ownerId, template } });
     // Demo people share their projects with each other; a real account starts
     // alone as founder and invites teammates with a link.
     const members = USERS.some((u) => u.id === ownerId) ? USERS : [{ id: ownerId, role: "founder" }];
     await scaffold(tx, p.id, healthcareComponents, members);
-    if (!healthcareComponents) {
+    if (template !== "auto" && template !== "booking") await addCatalogue(tx, p.id, template);
+    else if (!healthcareComponents) {
       // Generic component catalogue for non-healthcare products.
       const generic: [string, string, string][] = [
         ["nav", "Navigation", "frontend"], ["home-hero", "Home hero", "frontend"], ["feature-list", "Feature list", "frontend"], ["cta", "Call to action", "frontend"],

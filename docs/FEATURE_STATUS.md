@@ -5,6 +5,7 @@
 ## Functional
 - Two identifiable humans + one observer; per-tab signed sessions; project-level authorization on every API call; observers cannot mutate
 - Real-time sync across browser sessions (SSE), presence/online status, which view each person is on, follow mode, live cursors
+- Website templates: Let Bunty decide, Appointment booking, Landing page, Online store, Restaurant / café, Event, Portfolio. Picked with live thumbnails in New project and changeable in Settings (applies from the next preview). Section layouts are adapted from Start Bootstrap's MIT templates (Landing Page, Shop Homepage, Business Casual, Agency, Freelancer; see THIRD_PARTY_NOTICES.md). The store has a working cart and checkout; contact, reservation and registration forms save to the backend in downloaded projects
 - Live prompting: the product request box, preview feedback and Bunty chat are shared drafts. Everyone sees the text appear as it is typed, with a "<name> is typing…" indicator, and anyone can continue it; submitting empties the box for all. Last write wins (incoming text waits while you are typing); drafts live in the in-memory hub, so they are lost on server restart
 - Soft edit locks ("Aisha is currently editing REQ-001") + server-side optimistic version checks; conflicting proposals preserved with Rebase / Discard
 - Query simplification: original request shown beside structured requirements (ID, description, priority, author, timestamp, version, acceptance criteria, components, approval status); edit / reject / approve

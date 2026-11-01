@@ -15,6 +15,8 @@ import { BrandIcon, BrandName } from "@/components/brand";
 import { FeatureScroller, SectionHeading, TerminalDemo } from "@/components/landing/Sections";
 import { AuthCard } from "@/components/landing/AuthCard";
 import { Avatar, Badge, Button, Field, inputCls, Modal } from "@/components/ui";
+import { TemplatePicker } from "@/components/TemplatePicker";
+import type { TemplateKey } from "@/lib/engine/templates";
 
 interface U { id: string; name: string; title: string; color: string; email?: string | null; demo?: boolean }
 interface P { id: string; name: string; description: string; isDemo: boolean; phase: string; contextVersion: number; updatedAt: string; _count: { requirements: number; decisions: number } }
@@ -32,7 +34,7 @@ export default function Home() {
   const [me, setMe] = useState<U | null>(null);
   const [projects, setProjects] = useState<P[]>([]);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", healthcare: false });
+  const [form, setForm] = useState<{ name: string; description: string; healthcare: boolean; template: TemplateKey }>({ name: "", description: "", healthcare: false, template: "auto" });
   const [err, setErr] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [needIdentity, setNeedIdentity] = useState(false);
@@ -249,11 +251,15 @@ export default function Home() {
         </button>
       )}
 
-      <Modal open={creating} onClose={() => setCreating(false)} title="New project">
+      <Modal open={creating} onClose={() => setCreating(false)} title="New project" wide>
         <div className="space-y-4">
           <Field label="Name"><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Neighborhood Tool Library" /></Field>
           <Field label="One-line description"><input className={inputCls} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={form.healthcare} onChange={(e) => setForm({ ...form, healthcare: e.target.checked })} /> Use the healthcare booking component catalogue</label>
+          <div className="space-y-1.5">
+            <div className="text-sm font-medium" id="template-label">Template</div>
+            <TemplatePicker value={form.template} onChange={(template) => setForm({ ...form, template })} />
+          </div>
+          <p className="text-xs text-muted-foreground">Layouts adapted from Start Bootstrap&apos;s free templates (MIT). You can change the template later in Settings.</p>
           <div className="flex justify-end gap-2">
             <Button onClick={() => setCreating(false)}>Cancel</Button>
             <Button

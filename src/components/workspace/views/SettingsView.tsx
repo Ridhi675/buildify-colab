@@ -1,6 +1,8 @@
 "use client";
 
-import { Cpu, Rocket, ShieldCheck, Users, Wifi, WifiOff } from "lucide-react";
+import { Cpu, LayoutTemplate, Rocket, ShieldCheck, Users, Wifi, WifiOff } from "lucide-react";
+import { isTemplate, TEMPLATES, type TemplateKey } from "@/lib/engine/templates";
+import { TemplatePicker } from "../../TemplatePicker";
 import { useState } from "react";
 import { agentColor } from "../../effects";
 import { Avatar, Badge, Button, Card, CardHeader, Field, inputCls } from "../../ui";
@@ -9,6 +11,8 @@ import { ApprovalCard, useWs } from "../shared";
 export function SettingsView() {
   const { state, run, connected } = useWs();
   const [pol, setPol] = useState(state.project.policy);
+  const current: TemplateKey = isTemplate(state.project.template) ? state.project.template : "auto";
+  const [template, setTemplate] = useState<TemplateKey>(current);
   const ai = state.ai;
   const release = state.approvals.find((a) => a.kind === "release");
   const readOnly = state.me.role === "observer";
@@ -21,6 +25,16 @@ export function SettingsView() {
           subtitle={connected ? "Live updates, cursors and shared prompts are connected to the server." : "Reconnecting to the server… changes will sync when the connection is back."}
           actions={<Badge tone={connected ? "emerald" : "amber"}>{connected ? "Connected" : "Reconnecting"}</Badge>}
         />
+      </Card>
+
+      <Card>
+        <CardHeader
+          icon={<LayoutTemplate size={16} />}
+          title="Template"
+          subtitle={`Current: ${TEMPLATES[current].name}. A new template applies from the next preview. Layouts adapted from Start Bootstrap's free templates (MIT).`}
+          actions={!readOnly && <Button variant="primary" disabled={template === current} onClick={() => run({ type: "set_template", template }, "Template changed — regenerate the preview")}>Use this template</Button>}
+        />
+        <div className="p-4"><TemplatePicker value={template} onChange={setTemplate} disabled={readOnly} /></div>
       </Card>
 
       <Card>

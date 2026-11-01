@@ -4,6 +4,7 @@
 // (c) to keep unaffected components byte-identical during impact-aware rebuilds.
 
 import type { AppSpec, ReqLite, SpecComponent, SpecPage, Theme } from "../types";
+import { PRIMARY_SECTION, TEMPLATES, templatePages, type TemplateKey } from "./templates";
 
 const text = (reqs: ReqLite[]) =>
   reqs
@@ -95,17 +96,32 @@ export function isHealthcare(reqs: ReqLite[], name = "") {
   return has(text(reqs) + name.toLowerCase(), "health", "appointment", "doctor", "clinic", "patient");
 }
 
-/** Build the full spec for the current requirements. */
-export function deriveSpec(reqs: ReqLite[], appName: string): AppSpec {
+/** Build the full spec for the current requirements, on the project's template ("auto" picks one). */
+export function deriveSpec(reqs: ReqLite[], appName: string, template: TemplateKey = "auto"): AppSpec {
   const t = text(reqs);
   const theme = deriveTheme(reqs);
+  // A template brings its own accent unless the requirements already chose a colour.
+  if (theme.primary === "#4f46e5" && TEMPLATES[template].accent) theme.primary = TEMPLATES[template].accent!;
   const elderly = theme.fontScale >= 1.5;
   const simple = elderly || has(t, "simple navigation", "easy to navigate", "simplified");
   const navStyle: AppSpec["navigation"]["style"] =
     theme.layout === "mobile-first" ? "bottom-tabs" : simple ? "top" : "sidebar";
 
   let pages: SpecPage[];
-  if (isHealthcare(reqs, appName)) {
+  const booking = template === "booking" || (template === "auto" && isHealthcare(reqs, appName));
+  if (template !== "auto" && template !== "booking") {
+    const features = reqs.filter((r) => r.status === "approved" && r.category === "feature");
+    pages = templatePages(template, {
+      appName,
+      audience: reqs.find((r) => r.status === "approved" && r.category === "audience")?.description,
+      features,
+      comp: (key, type, title, body, items = []) => comp(reqs, key, type, title, body, items),
+    });
+    // Features no section claims are carried by the template's main section.
+    const claimed = new Set(pages.flatMap((p) => p.components.flatMap((c) => c.requirementKeys)));
+    const main = pages.flatMap((p) => p.components).find((c) => c.key === PRIMARY_SECTION[template]);
+    if (main) main.requirementKeys = [...main.requirementKeys, ...features.filter((f) => !claimed.has(f.key)).map((f) => f.key)];
+  } else if (booking) {
     const btn = elderly ? "Just two details. We will call you to confirm." : "We use these details to confirm your visit.";
     pages = [
       {
@@ -176,7 +192,7 @@ export function deriveSpec(reqs: ReqLite[], appName: string): AppSpec {
 
   return {
     appName,
-    tagline: elderly ? "Simple, readable care booking" : "Book care online",
+    tagline: template !== "auto" && template !== "booking" ? TEMPLATES[template].tagline : elderly ? "Simple, readable care booking" : "Book care online",
     theme,
     navigation: { style: navStyle, items: pages.map((p) => p.name) },
     pages,

@@ -35,6 +35,7 @@ model Project {
   contextVersion       Int      @default(0) // latest committed ContextVersion.number
   currentArtifactVerId String?
   phase                String   @default("requirements") // requirements | preview | build | review | released
+  template             String   @default("auto") // auto | booking | landing | store | restaurant | event | portfolio (see src/lib/engine/templates.ts)
   approvalPolicy       String   @default("{\"major\":2,\"minor\":1,\"release\":2}")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

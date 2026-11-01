@@ -5,6 +5,7 @@
 import { z } from "zod";
 import { structured, type LlmResult } from "./llm";
 import { applyDesignFeedback, deriveSpec, allComponents, type DesignOverride } from "../engine/spec";
+import type { TemplateKey } from "../engine/templates";
 import {
   CATEGORIES,
   PRIORITIES,
@@ -172,20 +173,23 @@ const CopySchema = z.object({
  * Structure and theme always come from the deterministic engine (so impact analysis
  * and partial rebuilds stay reliable); the LLM, when available, writes the copy.
  */
-export async function generateSpec(reqs: ReqLite[], appName: string, onlyKeys?: Set<string>, feedback: string[] = []): Promise<AiOutput<AppSpec>> {
-  const derived = deriveSpec(reqs, appName);
+export async function generateSpec(reqs: ReqLite[], appName: string, onlyKeys?: Set<string>, feedback: string[] = [], template: TemplateKey = "auto"): Promise<AiOutput<AppSpec>> {
+  const derived = deriveSpec(reqs, appName, template);
   const skeleton = { ...derived, theme: applyDesignFeedback(derived.theme, feedback).theme };
   const targets = allComponents(skeleton).filter((c) => !onlyKeys || onlyKeys.has(c.key));
   const out = await withFallback(
     () =>
       structured({
-        system: "You are Babli, the AI Builder. Write concise, realistic UI copy for each component. Keep the same keys. Honor every approved requirement.",
+        system: "You are Babli, the AI Builder. Write concise, realistic UI copy for each component. Keep the same keys. Honor every approved requirement. Titles, text and items are template placeholders: replace them with realistic content for THIS product (same number of items). Keep each item's format: parts separated by \" — \", prices with their currency symbol, quotes as “text” — Name.",
         schema: CopySchema,
         prompt:
           `Approved requirements:\n${JSON.stringify(reqs.filter((r) => r.status === "approved").map(({ key, title, description }) => ({ key, title, description })))}\n` +
           `Theme: ${JSON.stringify(skeleton.theme)}\n` +
           (feedback.length ? `Human feedback on earlier previews (oldest first, follow the latest): ${JSON.stringify(feedback)}\n` : "") +
-          `Components to write (keep keys, ≤6 items each):\n${JSON.stringify(targets.map(({ key, type, title, body, items }) => ({ key, type, title, body, items })))}`,
+          `Product: ${appName}\n` +
+          // Samples are labelled as examples so small models rewrite them instead of echoing them back.
+          `Components to write. For each, return the same key with a NEW title, body and items written for ${appName}; the examples only show the format (≤6 items each):\n` +
+          JSON.stringify(targets.map(({ key, type, title, body, items }) => ({ key, type, example_title: title, example_body: body, example_items: items }))),
       }),
     () => ({ tagline: skeleton.tagline, components: targets.map(({ key, title, body, items }) => ({ key, title, body, items })) }),
   );
