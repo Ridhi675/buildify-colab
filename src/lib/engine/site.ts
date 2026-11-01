@@ -1,16 +1,18 @@
-// Compiles an AppSpec into a standalone website: one self-contained HTML file
-// (inline CSS + a small fixed script) that runs in any browser and can be put
-// on any static host. Spec text is always HTML-escaped; the only script is the
-// fixed runtime below, so content from an LLM can never execute.
+// Compiles an AppSpec into a website. Two outputs share the same markup and CSS:
+// - renderSite: one self-contained HTML file (data saved in the visitor's browser)
+// - siteParts + API_RUNTIME: the frontend of the downloadable project, whose
+//   data goes to the generated Node backend (see project.ts)
+// Spec text is always HTML-escaped; the only scripts are the fixed runtimes
+// below, so content from an LLM can never execute.
 
 import type { AppSpec, SpecComponent, SpecPage, Theme } from "../types";
 
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app";
+export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app";
 
-/** File name for the downloaded site, e.g. "careconnect.html". */
+/** File name for the downloaded single-file site, e.g. "careconnect.html". */
 export const siteFileName = (spec: AppSpec) => `${slug(spec.appName)}.html`;
 
 function palette(t: Theme) {
@@ -75,7 +77,7 @@ function block(c: SpecComponent, pages: SpecPage[], pageIndex: number, booking: 
     case "form": {
       const fields = looksLikeFields(c.items) ? c.items : ["Title", "Details"];
       const what = looksLikeFields(c.items) ? "" : `<ul class="checks">${c.items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
-      inner = `${h("h3")}${body}${what}<form data-entries="${esc(c.key)}">${fields.map((f) => inputFor(f, f)).join("")}<button class="btn" type="submit">Save</button></form><div class="entries" data-list="${esc(c.key)}"></div>`;
+      inner = `${h("h3")}${body}${what}<form data-entries="${esc(c.key)}">${fields.map((f) => inputFor(f, f)).join("")}<p class="error" hidden></p><button class="btn" type="submit">Save</button></form><div class="entries" data-list="${esc(c.key)}"></div>`;
       break;
     }
     case "confirmation":
@@ -98,7 +100,8 @@ function block(c: SpecComponent, pages: SpecPage[], pageIndex: number, booking: 
   return `<section class="card" data-component="${esc(c.key)}">${inner}</section>`;
 }
 
-export function renderSite(spec: AppSpec): string {
+/** The shared pieces of both outputs: page title, CSS and the <body> markup (without scripts). */
+export function siteParts(spec: AppSpec, footer: string) {
   const t = spec.theme;
   const c = palette(t);
   const fs = t.fontScale || 1;
@@ -106,7 +109,6 @@ export function renderSite(spec: AppSpec): string {
   const nav = spec.navigation.style;
   const mobile = t.layout === "mobile-first";
   const booking = spec.pages.some((p) => p.components.some((x) => x.type === "booking-form"));
-  const storeKey = `rebrix-site:${slug(spec.appName)}`;
 
   const links = spec.pages.map((p) => `<a href="#/${esc(p.key)}" data-link="${esc(p.key)}">${esc(p.name)}</a>`).join("");
   const pages = spec.pages
@@ -163,15 +165,22 @@ ${nav === "bottom-tabs" ? "body{padding-bottom:72px}nav.tabs{position:fixed;bott
 ${t.motion === "reduced" ? "*{transition:none!important;animation:none!important;scroll-behavior:auto!important}" : ".btn,.item,.slot{transition:transform .12s}.btn:active,.item:active,.slot:active{transform:scale(.98)}"}
 `;
 
-  // Fixed runtime: hash routing, selections, forms and reminders saved in this browser.
-  const js = `
-(function(){
-var KEY=${JSON.stringify(storeKey)},mem={};
-function load(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){return mem}}
-function save(s){mem=s;try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}}
-var S=load();S.picks=S.picks||{};S.entries=S.entries||{};S.toggles=S.toggles||{};
+  const navHtml = `<nav class="${nav === "bottom-tabs" ? "tabs" : ""}" aria-label="Main">${links}</nav>`;
+  const body = `<div class="shell">
+<header class="top"><strong>${esc(spec.appName)}</strong><span>${esc(spec.tagline)}</span></header>
+${nav === "bottom-tabs" || nav === "sidebar" ? "" : navHtml}
+<div class="layout">${nav === "sidebar" ? navHtml : ""}<main>${pages}</main></div>
+${nav === "bottom-tabs" ? navHtml : ""}
+<footer>${esc(footer)}</footer>
+</div>`;
+  return { title: esc(spec.appName), description: esc(spec.tagline), css, body };
+}
+
+// Shared by both runtimes: hash routing and the selection/toggle UI state.
+const ROUTER = `
 function $(q,r){return Array.prototype.slice.call((r||document).querySelectorAll(q))}
 function text(tag,cls,t){var e=document.createElement(tag);if(cls)e.className=cls;if(t!=null)e.textContent=t;return e}
+function fields(form){var o={};$("input,textarea",form).forEach(function(i){o[i.name]=i.value.trim()});return o}
 function route(){
   var key=(location.hash.match(/^#\\/(.+)$/)||[])[1];var pages=$("[data-page]");
   var hit=pages.some(function(p){return p.getAttribute("data-page")===key});if(!hit)key=pages[0].getAttribute("data-page");
@@ -179,70 +188,121 @@ function route(){
   $("[data-link]").forEach(function(a){var on=a.getAttribute("data-link")===key;a.classList.toggle("active",on);if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
   window.scrollTo(0,0);paint();
 }
-function paint(){
+function paintPicks(){
   $("[data-pick]").forEach(function(b){b.classList.toggle("on",S.picks[b.getAttribute("data-pick")]===b.getAttribute("data-value"));b.setAttribute("aria-pressed",b.classList.contains("on"))});
   $("[data-needs]").forEach(function(a){a.setAttribute("aria-disabled",S.picks[a.getAttribute("data-needs")]?"false":"true")});
   $("[data-toggle]").forEach(function(i){var k=i.getAttribute("data-toggle");if(k in S.toggles)i.checked=S.toggles[k]});
+}
+function entryCard(e,onDelete){
+  var d=text("div","entry"),del=text("button",null,"Delete");del.type="button";del.onclick=onDelete;d.appendChild(del);
+  var keys=Object.keys(e.fields);d.appendChild(text("b",null,e.fields[keys[0]]||"(untitled)"));
+  keys.slice(1).forEach(function(f){if(e.fields[f])d.appendChild(text("div",null,f+": "+e.fields[f]))});
+  d.appendChild(text("small",null,new Date(e.at).toLocaleString()));return d;
+}
+function summaryList(b){var ul=text("ul","summary");Object.keys(b).forEach(function(k){if(b[k])ul.appendChild(text("li",null,k+": "+b[k]))});return ul}
+function selections(){var b={};Object.keys(S.picks).forEach(function(k){var el=document.querySelector('[data-component="'+k+'"] h3');b[el?el.textContent:k]=S.picks[k]});return b}
+function missingSlot(){var slots=$(".slot[data-pick]").map(function(x){return x.getAttribute("data-pick")});return slots.length&&!slots.some(function(k){return S.picks[k]})}
+document.addEventListener("click",function(e){
+  var b=e.target.closest&&e.target.closest("[data-pick]");if(!b)return;
+  S.picks[b.getAttribute("data-pick")]=b.getAttribute("data-value");saveUi();paintPicks();
+});
+document.addEventListener("change",function(e){
+  var k=e.target.getAttribute&&e.target.getAttribute("data-toggle");if(!k)return;S.toggles[k]=e.target.checked;saveUi();
+});
+window.addEventListener("hashchange",route);
+`;
+
+/** Single-file site: everything saved in this browser's localStorage. */
+function localRuntime(storeKey: string) {
+  return `
+(function(){
+var KEY=${JSON.stringify(storeKey)},mem={};
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){return mem}}
+function save(s){mem=s;try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}}
+function saveUi(){save(S)}
+var S=load();S.picks=S.picks||{};S.entries=S.entries||{};S.toggles=S.toggles||{};
+${ROUTER}
+function paint(){
+  paintPicks();
   $("[data-list]").forEach(function(box){
     var k=box.getAttribute("data-list"),list=S.entries[k]||[];box.innerHTML="";
     if(list.length)box.appendChild(text("small","muted",list.length+" saved"));
-    list.slice().reverse().forEach(function(e,ri){
-      var i=list.length-1-ri,d=text("div","entry"),del=text("button",null,"Delete");
-      del.type="button";del.onclick=function(){list.splice(i,1);S.entries[k]=list;save(S);paint()};
-      d.appendChild(del);var keys=Object.keys(e.fields);
-      d.appendChild(text("b",null,e.fields[keys[0]]||"(untitled)"));
-      keys.slice(1).forEach(function(f){if(e.fields[f])d.appendChild(text("div",null,f+": "+e.fields[f]))});
-      d.appendChild(text("small",null,new Date(e.at).toLocaleString()));box.appendChild(d);
-    });
+    list.slice().reverse().forEach(function(e,ri){var i=list.length-1-ri;box.appendChild(entryCard(e,function(){list.splice(i,1);S.entries[k]=list;save(S);paint()}))});
   });
-  $("[data-summary]").forEach(function(box){
-    box.innerHTML="";var b=S.booking;if(!b)return;var ul=text("ul","summary");
-    Object.keys(b).forEach(function(k){if(b[k])ul.appendChild(text("li",null,k+": "+b[k]))});box.appendChild(ul);
-  });
+  $("[data-summary]").forEach(function(box){box.innerHTML="";if(S.booking)box.appendChild(summaryList(S.booking))});
 }
-function fields(form){var o={};$("input,textarea",form).forEach(function(i){o[i.name]=i.value.trim()});return o}
-document.addEventListener("click",function(e){
-  var b=e.target.closest&&e.target.closest("[data-pick]");if(!b)return;
-  S.picks[b.getAttribute("data-pick")]=b.getAttribute("data-value");save(S);paint();
-});
-document.addEventListener("change",function(e){
-  var k=e.target.getAttribute&&e.target.getAttribute("data-toggle");if(!k)return;S.toggles[k]=e.target.checked;save(S);
-});
 document.addEventListener("submit",function(e){
-  var f=e.target;e.preventDefault();
+  var f=e.target;e.preventDefault();var err=f.querySelector(".error");
   if(f.hasAttribute("data-booking")){
-    var slots=$("[data-pick]").filter(function(x){return x.classList.contains("slot")}).map(function(x){return x.getAttribute("data-pick")});
-    var err=f.querySelector(".error");
-    if(slots.length&&!slots.some(function(k){return S.picks[k]})){err.textContent="Please choose a time first.";err.hidden=false;return}
-    err.hidden=true;var b={};Object.keys(S.picks).forEach(function(k){var el=document.querySelector('[data-component="'+k+'"] h3');b[el?el.textContent:k]=S.picks[k]});
-    var v=fields(f);Object.keys(v).forEach(function(k){b[k]=v[k]});S.booking=b;save(S);f.reset();location.hash="#/"+f.getAttribute("data-next");return;
+    if(missingSlot()){err.textContent="Please choose a time first.";err.hidden=false;return}
+    err.hidden=true;var b=selections(),v=fields(f);Object.keys(v).forEach(function(k){b[k]=v[k]});
+    S.booking=b;save(S);f.reset();location.hash="#/"+f.getAttribute("data-next");return;
   }
   var k=f.getAttribute("data-entries");if(!k)return;
   (S.entries[k]=S.entries[k]||[]).push({fields:fields(f),at:Date.now()});save(S);f.reset();paint();
 });
-window.addEventListener("hashchange",route);route();
+route();
 })();`;
+}
 
-  const navHtml = `<nav class="${nav === "bottom-tabs" ? "tabs" : ""}" aria-label="Main">${links}</nav>`;
+/** Frontend of the downloadable project: data goes to the generated backend's REST API. */
+export const API_RUNTIME = `// Frontend runtime: hash routing, selections, and calls to the backend API (server.js).
+(function(){
+var UI="ui:"+location.host;
+function loadUi(){try{return JSON.parse(localStorage.getItem(UI)||"{}")}catch(e){return {}}}
+function saveUi(){try{localStorage.setItem(UI,JSON.stringify({picks:S.picks,toggles:S.toggles}))}catch(e){}}
+var S=loadUi();S.picks=S.picks||{};S.toggles=S.toggles||{};
+function api(path,opts){
+  opts=opts||{};if(opts.body){opts.body=JSON.stringify(opts.body);opts.headers={"content-type":"application/json"}}
+  return fetch("/api"+path,opts).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||("Request failed ("+r.status+")"));return d})});
+}
+${ROUTER}
+function paint(){
+  paintPicks();
+  $("[data-list]").forEach(function(box){
+    var k=box.getAttribute("data-list");
+    api("/entries/"+encodeURIComponent(k)).then(function(list){
+      box.innerHTML="";if(list.length)box.appendChild(text("small","muted",list.length+" saved"));
+      list.slice().reverse().forEach(function(e){box.appendChild(entryCard(e,function(){api("/entries/"+encodeURIComponent(k)+"/"+e.id,{method:"DELETE"}).then(paint)}))});
+    }).catch(function(err){box.textContent="Could not load entries: "+err.message});
+  });
+  var id=sessionStorage.getItem("booking");
+  $("[data-summary]").forEach(function(box){
+    box.innerHTML="";if(!id)return;
+    api("/bookings/"+id).then(function(b){box.appendChild(summaryList(b.details))}).catch(function(){});
+  });
+}
+document.addEventListener("submit",function(e){
+  var f=e.target;e.preventDefault();var err=f.querySelector(".error");
+  function fail(x){if(err){err.textContent=x.message;err.hidden=false}}
+  if(err)err.hidden=true;
+  if(f.hasAttribute("data-booking")){
+    if(missingSlot())return fail(new Error("Please choose a time first."));
+    var b=selections(),v=fields(f);Object.keys(v).forEach(function(k){b[k]=v[k]});
+    api("/bookings",{method:"POST",body:{details:b}}).then(function(r){sessionStorage.setItem("booking",r.id);f.reset();location.hash="#/"+f.getAttribute("data-next")}).catch(fail);return;
+  }
+  var k=f.getAttribute("data-entries");if(!k)return;
+  api("/entries/"+encodeURIComponent(k),{method:"POST",body:{fields:fields(f)}}).then(function(){f.reset();paint()}).catch(fail);
+});
+route();
+})();
+`;
+
+export function renderSite(spec: AppSpec): string {
+  const p = siteParts(spec, "Built with ReBrix · data you enter is saved in this browser only");
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ReBrix">
-<meta name="description" content="${esc(spec.tagline)}">
-<title>${esc(spec.appName)}</title>
-<style>${css}</style>
+<meta name="description" content="${p.description}">
+<title>${p.title}</title>
+<style>${p.css}</style>
 </head>
 <body>
-<div class="shell">
-<header class="top"><strong>${esc(spec.appName)}</strong><span>${esc(spec.tagline)}</span></header>
-${nav === "bottom-tabs" ? "" : nav === "sidebar" ? "" : navHtml}
-<div class="layout">${nav === "sidebar" ? navHtml : ""}<main>${pages}</main></div>
-${nav === "bottom-tabs" ? navHtml : ""}
-<footer>Built with ReBrix · data you enter is saved in this browser only</footer>
-</div>
-<script>${js}</script>
+${p.body}
+<script>${localRuntime(`rebrix-site:${slug(spec.appName)}`)}</script>
 </body>
 </html>`;
 }

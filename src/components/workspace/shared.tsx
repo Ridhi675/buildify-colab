@@ -229,18 +229,18 @@ export function Done({ children }: { children: React.ReactNode }) {
   return <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 size={13} />{children}</span>;
 }
 
-/** Open or download the artifact as a standalone website (one HTML file that runs anywhere). */
+/** Open the product as a website, or download it as a runnable project (backend + frontend + README). */
 export function SiteButtons({ query }: { query: string }) {
   const { state } = useWs();
   const href = (download: boolean) =>
-    `/api/projects/${state.project.id}/site?${query}${download ? "&download=1" : ""}&t=${encodeURIComponent(getToken() ?? "")}`;
+    `/api/projects/${state.project.id}/site?${query}${download ? "&format=project" : ""}&t=${encodeURIComponent(getToken() ?? "")}`;
   return (
     <>
       <Button size="sm" title="Open the generated website in a new tab" onClick={() => void window.open(href(false), "_blank", "noopener")}>
         <ExternalLink size={13} /> Open website
       </Button>
-      <Button size="sm" title="Download a single HTML file you can host on Netlify, GitHub Pages or any static host" onClick={() => window.location.assign(href(true))}>
-        <Download size={13} /> Download
+      <Button size="sm" title="Download the full project (Node.js backend, frontend, README) as a .zip and run it locally with npm start" onClick={() => window.location.assign(href(true))}>
+        <Download size={13} /> Download project
       </Button>
     </>
   );
